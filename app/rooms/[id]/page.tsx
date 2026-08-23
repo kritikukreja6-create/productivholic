@@ -120,9 +120,9 @@ export default function FocusRoom({ params }: { params: Promise<{ id: string }> 
     const zp = ZegoUIKitPrebuilt.create(kitToken);
     zp.joinRoom({
       container: element,
-      showPreJoinView: false, // Bypasses the white holding screen
+      showPreJoinView: true, // Bypasses the white holding screen
       turnOnMicrophoneWhenJoining: false, 
-      turnOnCameraWhenJoining: true,
+      turnOnCameraWhenJoining: false,
       showMyCameraToggleButton: true,
       showMyMicrophoneToggleButton: true,
       showAudioVideoSettingsButton: true,
