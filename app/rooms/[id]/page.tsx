@@ -1,6 +1,6 @@
 'use client';
 
-import PomodoroTimer from '../../components/PomodoroTimer';
+import PomodoroTimer from '../../../components/PomodoroTimer';
 import { useState, useEffect, useRef, use, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';

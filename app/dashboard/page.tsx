@@ -2,6 +2,8 @@
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
+import GoalCreator from '@/components/GoalCreator';
+import RoadmapDisplay from '@/components/RoadmapDisplay';
 
 export default function Dashboard() {
   const supabase = createBrowserClient(
@@ -9,8 +11,12 @@ export default function Dashboard() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // Goal State
   const router = useRouter();
+  
+  // NEW: State to store the user ID for our AI components
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Goal State
   const [goals, setGoals] = useState<any[]>([]);
   const [newGoalTitle, setNewGoalTitle] = useState('');
   const [duration, setDuration] = useState(10);
@@ -28,6 +34,9 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    
+    // NEW: Save the user ID to state so we can pass it to components
+    setUserId(user.id);
 
     // 1. Fetch Goals & Penalties
     await supabase.rpc('enforce_penalties', { user_uid: user.id });
@@ -84,7 +93,6 @@ export default function Dashboard() {
     }
   };
 
-  // ... (Keep handleCreateGoal and handleCheckIn exactly the same as before)
   const handleCreateGoal = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -175,6 +183,19 @@ export default function Dashboard() {
 
         <hr className="border-gray-200" />
 
+        {/* MIDDLE SECTION: AI Roadmap Generator */}
+        {userId && (
+          <div>
+            <h2 className="text-2xl font-bold mb-6">AI-Powered Roadmap</h2>
+            <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-100">
+              <GoalCreator userId={userId} />
+              <RoadmapDisplay userId={userId} />
+            </div>
+          </div>
+        )}
+
+        <hr className="border-gray-200" />
+
         {/* BOTTOM SECTION: Community Matchmaking */}
         <div>
           <h2 className="text-2xl font-bold mb-6">Suggested Focus Rooms</h2>
@@ -192,7 +213,7 @@ export default function Dashboard() {
                     </div>
                     <button 
                       onClick={() => hasJoined ? router.push(`/rooms/${group.id}`) : handleJoinGroup(group.id)}
-
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold text-sm transition"
                     >
                       {hasJoined ? 'Enter Chat ->' : 'Join Room'}
                     </button>
