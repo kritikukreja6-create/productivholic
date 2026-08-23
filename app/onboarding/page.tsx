@@ -47,9 +47,9 @@ export default function OnboardingFlow() {
       .upsert({
         user_id: user.id,
         age: parseInt(age) || null,
-        field_of_interest_id: selectedInterestId || null,
+        interest_id: selectedInterestId || null,
         skill_level: skillLevel,
-      }), { onConflict: 'user_id' });
+      }, { onConflict: 'user_id' });
 
     if (submitError) {
       setError(submitError.message);
