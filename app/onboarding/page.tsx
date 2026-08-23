@@ -47,7 +47,7 @@ export default function OnboardingFlow() {
       .upsert({
         user_id: user.id,
         age: parseInt(age) || null,
-        interest_id: selectedInterestId || null,
+        field_of_interest_id: selectedInterestId || null,
         skill_level: skillLevel,
       });
 
