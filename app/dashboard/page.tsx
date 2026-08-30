@@ -16,12 +16,14 @@ export default function Dashboard() {
   // NEW: State to store the user ID for our AI components
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Goal State
+  
+// Goal State
   const [goals, setGoals] = useState<any[]>([]);
   const [newGoalTitle, setNewGoalTitle] = useState('');
+  const [goalSelection, setGoalSelection] = useState(''); 
   const [duration, setDuration] = useState(10);
-  const [loading, setLoading] = useState(false);
-  const [completedToday, setCompletedToday] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(false); // <-- Add this back
+  const [completedToday, setCompletedToday] = useState<Record<string, boolean>>({}); // <-- Add this back
 
   // Matchmaking State
   const [suggestedGroups, setSuggestedGroups] = useState<any[]>([]);
@@ -101,7 +103,7 @@ export default function Dashboard() {
       const { error } = await supabase.from('goals').insert({
         user_id: user.id, title: newGoalTitle, duration_days: duration, points: 0,
       });
-      if (!error) { setNewGoalTitle(''); setDuration(10); fetchDashboardData(); }
+      if (!error) { setNewGoalTitle(''); setGoalSelection(''); setDuration(10); fetchDashboardData(); }
     }
     setLoading(false);
   };
@@ -135,23 +137,53 @@ export default function Dashboard() {
           <div className="md:col-span-1 bg-white p-6 rounded-lg shadow-md h-fit">
             <h2 className="text-xl font-bold mb-4">Start a Challenge</h2>
             <form onSubmit={handleCreateGoal} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">What is your goal?</label>
-                <input type="text" required placeholder="e.g., Build a Next.js API" className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500" value={newGoalTitle} onChange={(e) => setNewGoalTitle(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Duration</label>
-                <select className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500" value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
-                  <option value={10}>10 Days</option>
-                  <option value={15}>15 Days</option>
-                  <option value={20}>20 Days</option>
-                  <option value={30}>30 Days</option>
-                </select>
-              </div>
-              <button type="submit" disabled={loading || !newGoalTitle} className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:opacity-50">
-                {loading ? 'Starting...' : 'Commit to Goal'}
-              </button>
-            </form>
+            <div>
+            <label className="block text-sm font-medium mb-1">What is your goal?</label>
+            <select 
+            className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 mb-2 bg-white"
+            value={goalSelection}
+            onChange={(e) => {
+            setGoalSelection(e.target.value);
+            if (e.target.value !== 'custom') {
+            setNewGoalTitle(e.target.value);
+            } else {
+            setNewGoalTitle('');
+            }
+      }}
+          required
+         >
+      <option value="" disabled>Select a trending goal...</option>
+      <option value="Solve 20 DSA problems in C">Solve 20 DSA problems in C</option>
+      <option value="Build a Full-Stack Next.js & Supabase App">Build a Full-Stack Next.js & Supabase App</option>
+      <option value="Merge an SSoC Open Source PR">Merge an SSoC Open Source PR</option>
+      <option value="Complete a Data Analysis project">Complete a Data Analysis project</option>
+      <option value="custom">Other (Type a custom goal)</option>
+      </select>
+
+      {goalSelection === 'custom' && (
+      <input 
+        type="text" 
+        required 
+        placeholder="e.g., Read 10 pages of a book" 
+        className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 animate-in fade-in slide-in-from-top-2" 
+        value={newGoalTitle} 
+        onChange={(e) => setNewGoalTitle(e.target.value)} 
+      />
+      )}
+      </div>
+  <div>
+    <label className="block text-sm font-medium mb-1">Duration</label>
+    <select className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 bg-white" value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
+      <option value={10}>10 Days</option>
+      <option value={15}>15 Days</option>
+      <option value={20}>20 Days</option>
+      <option value={30}>30 Days</option>
+    </select>
+  </div>
+  <button type="submit" disabled={loading || !newGoalTitle} className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:opacity-50 transition">
+    {loading ? 'Starting...' : 'Commit to Goal'}
+  </button>
+  </form>
           </div>
 
           <div className="md:col-span-2 space-y-4">
