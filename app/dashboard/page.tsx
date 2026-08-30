@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import GoalCreator from '@/components/GoalCreator';
 import RoadmapDisplay from '@/components/RoadmapDisplay';
+import Link from 'next/link';
 
 export default function Dashboard() {
   const supabase = createBrowserClient(
@@ -39,6 +40,7 @@ export default function Dashboard() {
     
     // NEW: Save the user ID to state so we can pass it to components
     setUserId(user.id);
+   
 
     // 1. Fetch Goals & Penalties
     await supabase.rpc('enforce_penalties', { user_uid: user.id });
@@ -131,11 +133,24 @@ export default function Dashboard() {
   return (
     <main className="min-h-screen bg-gray-50 p-8 text-gray-800">
       <div className="max-w-5xl mx-auto space-y-12">
-        
+        {/* TOP HEADER WITH PROFILE BUTTON */}
+    <div className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+      <div>
+        <h1 className="text-2xl font-bold">Productivity Dashboard</h1>
+        <p className="text-sm text-gray-500">Track your goals and connect with your study groups.</p>
+      </div>
+      <Link 
+        href="/profile/Kryttic_0" 
+        className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-semibold hover:bg-blue-100 transition shadow-sm"
+      >
+        View My Profile &rarr;
+      </Link>
+    </div>
         {/* TOP SECTION: Gamified Task Engine */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-1 bg-white p-6 rounded-lg shadow-md h-fit">
             <h2 className="text-xl font-bold mb-4">Start a Challenge</h2>
+        
             <form onSubmit={handleCreateGoal} className="space-y-4">
             <div>
             <label className="block text-sm font-medium mb-1">What is your goal?</label>
@@ -194,6 +209,7 @@ export default function Dashboard() {
               goals.map((goal) => {
                 const isDone = completedToday[goal.id];
                 return (
+                  
                   <div key={goal.id} className="bg-white p-6 rounded-lg shadow-md flex justify-between items-center border-l-4 border-blue-600">
                     <div className="space-y-2">
                       <h3 className="text-lg font-bold">{goal.title}</h3>
@@ -251,6 +267,7 @@ export default function Dashboard() {
                       <h3 className="text-lg font-bold">{group.name}</h3>
                       <p className="text-sm text-gray-600 mt-1">{group.description}</p>
                     </div>
+                   
                     <button 
                       onClick={() => hasJoined ? router.push(`/rooms/${group.id}`) : handleJoinGroup(group.id)}
                       className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold text-sm transition"
