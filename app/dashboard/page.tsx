@@ -198,7 +198,15 @@ export default function Dashboard() {
 
         {/* BOTTOM SECTION: Community Matchmaking */}
         <div>
-          <h2 className="text-2xl font-bold mb-6">Suggested Focus Rooms</h2>
+          <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Your Focus Rooms</h2>
+          <button 
+          onClick={() => router.push('/explore')}
+          className="text-blue-600 hover:text-blue-800 font-semibold text-sm"
+          >
+          Explore More Rooms &rarr;
+          </button>
+        </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {suggestedGroups.length === 0 ? (
               <div className="col-span-full text-gray-500 italic">No groups available for your interest yet.</div>
