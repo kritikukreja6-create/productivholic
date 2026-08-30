@@ -1,194 +1,165 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 
 export default function AuthFlow() {
+  const router = useRouter();
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
-  
-  // UI State Management
-  const [step, setStep] = useState<'email' | 'otp' | 'details'>('email');
+
+  // Tab State: 'login' vs 'signup'
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form Data State
+  // Form Fields
   const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
-  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
 
-  // Regex for strong password: 8-12 chars, 1 uppercase, 1 number, 1 special char
-  const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,12}$/;
-
-  const handleSendOtp = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: true,
-      },
-    });
+    try {
+      if (mode === 'login') {
+        // 1. Direct Password Login
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
-    if (error) {
-      setError(error.message);
-    } else {
-      setStep('otp');
-    }
-    setLoading(false);
-  };
+        if (signInError) throw signInError;
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+        router.push('/dashboard');
+      } else {
+        // 2. Direct Sign Up + Profile Creation
+        if (password.length < 6) {
+          throw new Error('Password must be at least 6 characters long.');
+        }
 
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token: otp,
-      type: 'email',
-    });
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
 
-    if (error) {
-      setError(error.message);
-    } else {
-      setStep('details');
-    }
-    setLoading(false);
-  };
+        if (signUpError) throw signUpError;
 
-  const handleCompleteProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+        // Update profile username if signup succeeded
+        if (signUpData.user) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({ username })
+            .eq('id', signUpData.user.id);
 
-    if (!passwordRegex.test(password)) {
-      setError("Password must be 8-12 characters, with at least one uppercase letter, one number, and one special character.");
-      setLoading(false);
-      return;
-    }
+          if (profileError) {
+            console.error('Failed to set username:', profileError);
+          }
+        }
 
-    // 1. Update the user's secure password in auth.users
-    const { error: passwordError } = await supabase.auth.updateUser({
-      password: password
-    });
-
-    if (passwordError) {
-      setError(passwordError.message);
-      setLoading(false);
-      return;
-    }
-
-    // 2. Update the auto-generated profile row with the new username
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ username: username })
-        .eq('id', user.id);
-
-      if (profileError) {
-        setError("Username might already be taken. Please try another.");
-        setLoading(false);
-        return;
+        // Direct them straight to onboarding questionnaire
+        router.push('/onboarding');
       }
-      
-      // Success! Redirect to the dynamic onboarding questionnaire
-      window.location.href = '/onboarding'; 
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md text-gray-800">
-      <h2 className="text-2xl font-bold mb-6 text-center">Join the Workspace</h2>
-      
-      {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">{error}</div>}
+      {/* Mode Switcher Tabs */}
+      <div className="flex border-b border-gray-200 mb-6">
+        <button
+          type="button"
+          onClick={() => { setMode('login'); setError(null); }}
+          className={`flex-1 py-2 text-center font-semibold text-sm transition-colors border-b-2 ${
+            mode === 'login'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Sign In
+        </button>
+        <button
+          type="button"
+          onClick={() => { setMode('signup'); setError(null); }}
+          className={`flex-1 py-2 text-center font-semibold text-sm transition-colors border-b-2 ${
+            mode === 'signup'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Create Account
+        </button>
+      </div>
 
-      {step === 'email' && (
-        <form onSubmit={handleSendOtp} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Email Address</label>
-            <input 
-              type="email" 
-              required
-              className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? 'Sending...' : 'Send Login Code'}
-          </button>
-        </form>
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+          {error}
+        </div>
       )}
 
-      {step === 'otp' && (
-        <form onSubmit={handleVerifyOtp} className="space-y-4">
+      <form onSubmit={handleAuth} className="space-y-4">
+        {mode === 'signup' && (
           <div>
-            <label className="block text-sm font-medium mb-1">Enter 6-Digit Code</label>
-            <input 
-              type="text" 
+            <label className="block text-sm font-medium mb-1">Username</label>
+            <input
+              type="text"
               required
-              maxLength={8}
-              className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 text-center tracking-widest text-lg"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-            />
-          </div>
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? 'Verifying...' : 'Verify Code'}
-          </button>
-        </form>
-      )}
-
-      {step === 'details' && (
-        <form onSubmit={handleCompleteProfile} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Choose a Username</label>
-            <input 
-              type="text" 
-              required
-              className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g. alex_dev"
+              className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Set a Password</label>
-            <input 
-              type="password" 
-              required
-              className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              8-12 characters. Must include 1 uppercase, 1 number, and 1 special character.
-            </p>
-          </div>
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700 disabled:opacity-50"
-          >
-            {loading ? 'Saving...' : 'Complete Account Setup'}
-          </button>
-        </form>
-      )}
+        )}
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Email Address</label>
+          <input
+            type="email"
+            required
+            placeholder="you@example.com"
+            className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Password</label>
+          <input
+            type="password"
+            required
+            placeholder="••••••••"
+            className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          {mode === 'signup' && (
+            <p className="text-xs text-gray-500 mt-1">Minimum 6 characters.</p>
+          )}
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-blue-600 text-white p-2.5 rounded font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
+        >
+          {loading
+            ? 'Processing...'
+            : mode === 'login'
+            ? 'Sign In'
+            : 'Get Started'}
+        </button>
+      </form>
     </div>
   );
 }

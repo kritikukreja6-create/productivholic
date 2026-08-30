@@ -1,34 +1,44 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+'use client'
 
-export default async function RoadmapDisplay({ userId }: { userId: string }) {
-  const cookieStore = cookies()
-  
-  // Initialize Supabase for Server Components
-  const supabase = createServerClient(
+import { useEffect, useState } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
+
+export default function RoadmapDisplay({ userId }: { userId: string }) {
+  const [tasks, setTasks] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Initialize Supabase for Client Components
+  const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) { return cookieStore.get(name)?.value },
-      },
-    }
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  // Fetch the tasks for this user
-  const { data: tasks, error } = await supabase
-    .from('ai_roadmap')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: true }) // Keeps the 30 days in the correct order
+  useEffect(() => {
+    if (!userId) return
 
-  if (error) {
-    console.error("Error fetching roadmap:", error)
-    return <div>Error loading roadmap data.</div>
+    const fetchRoadmap = async () => {
+      const { data, error } = await supabase
+        .from('ai_roadmap')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true })
+
+      if (error) {
+        console.error("Error fetching roadmap:", error)
+      } else if (data) {
+        setTasks(data)
+      }
+      setLoading(false)
+    }
+
+    fetchRoadmap()
+  }, [userId])
+
+  if (loading) {
+    return <div className="mt-8 text-gray-500 animate-pulse">Loading your AI roadmap...</div>
   }
 
-  // Show a friendly empty state if they haven't generated one yet
-  if (!tasks || tasks.length === 0) {
+  if (tasks.length === 0) {
     return <div className="mt-8 text-gray-500">No roadmap generated yet. Enter a goal above to get started!</div>
   }
 
@@ -39,18 +49,22 @@ export default async function RoadmapDisplay({ userId }: { userId: string }) {
         {tasks.map((task) => (
           <li 
             key={task.id} 
-            // A tiny bit of inline Tailwind to visually separate active vs locked tasks
-            className={`p-3 border rounded-md flex items-start gap-3 ${task.status === 'locked' ? 'opacity-50 bg-gray-50' : 'bg-white'}`}
+            className={`p-3 border rounded-md flex items-start gap-3 transition-opacity ${task.status === 'locked' ? 'opacity-50 bg-gray-50' : 'bg-white shadow-sm'}`}
           >
             <input 
               type="checkbox" 
-              className="mt-1"
+              className="mt-1 w-4 h-4 text-blue-600 rounded cursor-pointer"
               checked={task.status === 'completed'} 
-              readOnly // We will add the complete action later!
+              readOnly 
               disabled={task.status === 'locked'}
             />
             <div>
-              <p className="font-semibold">{task.timeframe} <span className="text-xs font-normal text-gray-400 uppercase ml-2">{task.status}</span></p>
+              <p className="font-semibold text-gray-900">
+                {task.timeframe} 
+                <span className={`text-xs font-bold uppercase ml-2 ${task.status === 'active' ? 'text-blue-600' : 'text-gray-400'}`}>
+                  {task.status}
+                </span>
+              </p>
               <p className="text-gray-700">{task.task_title}</p>
             </div>
           </li>
