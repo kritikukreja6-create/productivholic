@@ -42,6 +42,7 @@ export default function Dashboard() {
     if (!user) return;
     
     // NEW: Save the user ID to state so we can pass it to components
+    setUserId(user.id);
    const { data: profileData } = await supabase
   .from('profiles')
   .select('username')
