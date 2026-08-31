@@ -35,8 +35,10 @@ export async function generateRoadmap(goalTitle: string, userId: string) {
    const roadmapTasks = JSON.parse(responseText);
 
     // 5. Initialize Supabase
-    const cookieStore = cookies();
+    // 5. Initialize Supabase
+    const cookieStore = await cookies();
     const supabase = createServerClient(
+    
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
