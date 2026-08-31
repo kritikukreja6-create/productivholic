@@ -15,9 +15,12 @@ export default function Dashboard() {
   const router = useRouter();
   
   // NEW: State to store the user ID for our AI components
+   const [username, setUsername] = useState<string | null>(null);
+
   const [userId, setUserId] = useState<string | null>(null);
 
-  
+
+
 // Goal State
   const [goals, setGoals] = useState<any[]>([]);
   const [newGoalTitle, setNewGoalTitle] = useState('');
@@ -39,7 +42,15 @@ export default function Dashboard() {
     if (!user) return;
     
     // NEW: Save the user ID to state so we can pass it to components
-    setUserId(user.id);
+   const { data: profileData } = await supabase
+  .from('profiles')
+  .select('username')
+  .eq('id', user.id)
+  .maybeSingle();
+
+if (profileData?.username) {
+  setUsername(profileData.username);
+}
    
 
     // 1. Fetch Goals & Penalties
@@ -72,20 +83,20 @@ export default function Dashboard() {
     }
 
     // 2. Fetch Matchmaking Data
-    const { data: profileData } = await supabase
-      .from('onboarding_responses')
-      .select('field_of_interest_id')
-      .eq('user_id', user.id)
-      .single();
+const { data: onboardingData } = await supabase
+  .from('onboarding_responses')
+  .select('field_of_interest_id')
+  .eq('user_id', user.id)
+  .maybeSingle();
 
-    if (profileData?.field_of_interest_id) {
-      const { data: groupsData } = await supabase
-        .from('focus_groups')
-        .select('*')
-        .eq('field_of_interest_id', profileData.field_of_interest_id);
-      
-      if (groupsData) setSuggestedGroups(groupsData);
-    }
+if (onboardingData?.field_of_interest_id) {
+  const { data: groupsData } = await supabase
+    .from('focus_groups')
+    .select('*')
+    .eq('field_of_interest_id', onboardingData.field_of_interest_id);
+  
+  if (groupsData) setSuggestedGroups(groupsData);
+}
 
     const { data: memberships } = await supabase
       .from('group_members')
@@ -132,21 +143,23 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-gray-50 p-8 text-gray-800">
-      <div className="max-w-5xl mx-auto space-y-12">
-        {/* TOP HEADER WITH PROFILE BUTTON */}
+  <div className="max-w-5xl mx-auto space-y-12">
+    
+    {/* TOP HEADER WITH PROFILE BUTTON */}
     <div className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm border border-gray-100">
       <div>
         <h1 className="text-2xl font-bold">Productivity Dashboard</h1>
         <p className="text-sm text-gray-500">Track your goals and connect with your study groups.</p>
       </div>
       <Link 
-        href="/profile/Kryttic_0" 
+        href={username ? `/profile/${username}` : '#'} 
         className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-semibold hover:bg-blue-100 transition shadow-sm"
       >
         View My Profile &rarr;
       </Link>
     </div>
-        {/* TOP SECTION: Gamified Task Engine */}
+
+    {/* TOP SECTION: Gamified Task Engine */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-1 bg-white p-6 rounded-lg shadow-md h-fit">
             <h2 className="text-xl font-bold mb-4">Start a Challenge</h2>
