@@ -21,7 +21,7 @@ export default function RoadmapDisplay({ userId }: { userId: string }) {
         .from('ai_roadmap')
         .select('*')
         .eq('user_id', userId)
-        .order('created_at', { ascending: true })
+       
 
       if (error) {
         console.error("Error fetching roadmap:", error)
