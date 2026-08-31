@@ -45,7 +45,7 @@ export default function RoadmapDisplay({ userId }: { userId: string }) {
   return (
     <div className="mt-8">
       <h2 className="text-xl font-bold mb-4">Your 30-Day Roadmap</h2>
-      <ul className="space-y-3">
+      <ul className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
         {tasks.map((task) => (
           <li 
             key={task.id} 
