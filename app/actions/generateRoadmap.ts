@@ -11,9 +11,9 @@ export async function generateRoadmap(goalTitle: string, userId: string) {
   try {
     // 1. Setup the model and force JSON output
     const model = genAI.getGenerativeModel({
-  model: "gemini-1.5-flash",
+  model: "gemini-2.5-flash",
   generationConfig: { responseMimeType: "application/json" }
-    });
+});
 
     // 2. The Prompt
     const prompt = `
