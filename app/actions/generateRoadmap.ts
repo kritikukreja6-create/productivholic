@@ -10,9 +10,9 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 export async function generateRoadmap(goalTitle: string, userId: string) {
   try {
     // 1. Setup the model and force JSON output
-    // 1. Setup the model
-     const model = genAI.getGenerativeModel({
-     model: "gemini-pro"
+    const model = genAI.getGenerativeModel({
+  model: "gemini-1.5-flash",
+  generationConfig: { responseMimeType: "application/json" }
     });
 
     // 2. The Prompt
@@ -30,11 +30,9 @@ export async function generateRoadmap(goalTitle: string, userId: string) {
     `;
 
     // 3. Call Gemini
-    const result = await model.generateContent(prompt);
-    let responseText = result.response.text();
-    responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-    // 4. Parse the AI's JSON output
-    const roadmapTasks = JSON.parse(responseText);
+   const result = await model.generateContent(prompt);
+   const responseText = result.response.text();
+   const roadmapTasks = JSON.parse(responseText);
 
     // 5. Initialize Supabase
     const cookieStore = cookies();
