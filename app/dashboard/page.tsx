@@ -133,6 +133,16 @@ if (onboardingData?.field_of_interest_id) {
       }
     }
   };
+  {/* MIDDLE SECTION: AI Roadmap Generator */}
+{userId && (
+  <div>
+    <h2 className="text-2xl font-bold mb-6">AI-Powered Roadmap</h2>
+    <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-100">
+      <GoalCreator userId={userId} onRoadmapCreated={fetchDashboardData} />
+      <RoadmapDisplay userId={userId} />
+    </div>
+  </div>
+)}
 
   const handleJoinGroup = async (groupId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
