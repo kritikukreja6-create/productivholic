@@ -49,35 +49,50 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Pomodoro Timer */}
-      <div className="md:col-span-2 bg-white p-12 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center">
-        <h2 className="text-xl font-bold text-gray-400 uppercase tracking-widest mb-4">Focus Room: {roomId}</h2>
-        <div className="text-8xl font-black text-gray-900 tracking-tighter">
-          {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-        </div>
+    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      {/* 1. Live Video Conference (Jitsi Embedded) */}
+      <div className="lg:col-span-2 bg-black rounded-xl overflow-hidden shadow-sm border border-gray-100 h-[600px]">
+        <iframe
+          src={`https://meet.jit.si/ProductivholicRoom_${roomId}`}
+          allow="camera; microphone; fullscreen; display-capture"
+          className="w-full h-full border-0"
+        />
       </div>
 
-      {/* Accountability Chat */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-[500px]">
-        <div className="p-4 border-b border-gray-100 font-bold">Accountability Chat</div>
-        <div className="flex-1 p-4 overflow-y-auto space-y-3">
-          {messages.map((msg, i) => (
-            <div key={i} className="bg-gray-50 p-3 rounded-lg text-sm">
-              <span className="font-bold text-blue-600 mr-2">{msg.user}:</span>
-              {msg.text}
-            </div>
-          ))}
+      {/* 2. Right Sidebar: Timer & Chat */}
+      <div className="flex flex-col gap-6 h-[600px]">
+        
+        {/* Pomodoro Timer */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center flex-shrink-0">
+          <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Focus Room</h2>
+          <div className="text-6xl font-black text-gray-900 tracking-tighter">
+            {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+          </div>
         </div>
-        <form onSubmit={sendMessage} className="p-4 border-t border-gray-100">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Encourage the room..."
-            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-        </form>
+
+        {/* Accountability Chat */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col flex-1 overflow-hidden">
+          <div className="p-4 border-b border-gray-100 font-bold text-sm bg-gray-50">Accountability Chat</div>
+          <div className="flex-1 p-4 overflow-y-auto space-y-3">
+            {messages.map((msg, i) => (
+              <div key={i} className="bg-blue-50/50 p-3 rounded-lg text-sm border border-blue-100/50">
+                <span className="font-bold text-blue-600 mr-2">{msg.user}:</span>
+                <span className="text-gray-700">{msg.text}</span>
+              </div>
+            ))}
+          </div>
+          <form onSubmit={sendMessage} className="p-3 border-t border-gray-100 bg-gray-50">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Encourage the room..."
+              className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm outline-none"
+            />
+          </form>
+        </div>
+
       </div>
     </div>
   );

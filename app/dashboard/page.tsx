@@ -5,6 +5,8 @@ import { createBrowserClient } from '@supabase/ssr';
 import GoalCreator from '@/components/GoalCreator';
 import RoadmapDisplay from '@/components/RoadmapDisplay';
 import Link from 'next/link';
+import LogoutButton from '@/components/LogoutButton';
+
 
 export default function Dashboard() {
   const supabase = createBrowserClient(
@@ -157,18 +159,23 @@ if (onboardingData?.field_of_interest_id) {
   <div className="max-w-5xl mx-auto space-y-12">
     
     {/* TOP HEADER WITH PROFILE BUTTON */}
-    <div className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-      <div>
-        <h1 className="text-2xl font-bold">Productivity Dashboard</h1>
-        <p className="text-sm text-gray-500">Track your goals and connect with your study groups.</p>
-      </div>
-      <Link 
-        href={username ? `/profile/${username}` : '#'} 
-        className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-semibold hover:bg-blue-100 transition shadow-sm"
-      >
-        View My Profile &rarr;
-      </Link>
-    </div>
+<div className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm border-b">
+  <div>
+    <h1 className="text-2xl font-bold">Productivity Dashboard</h1>
+    <p className="text-sm text-gray-500">Track your goals and connect with your study groups.</p>
+  </div>
+  
+  {/* Wrap the buttons in a flex container so they stay together on the right */}
+  <div className="flex items-center gap-4">
+    <Link
+      href={username ? `/profile/${username}` : '#'}
+      className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-semibold hover:bg-blue-100 transition"
+    >
+      View My Profile &rarr;
+    </Link>
+    <LogoutButton />
+  </div>
+</div>
 
     {/* TOP SECTION: Gamified Task Engine */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
