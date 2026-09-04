@@ -13,40 +13,70 @@ export default function RoadmapDisplay({ userId }: { userId: string }) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  useEffect(() => {
-    if (!userId) return
-
-    const fetchRoadmap = async () => {
-      // 1. First, find the user's active goal
-      const { data: activeGoal } = await supabase
-        .from('goals')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .single();
-
-      if (!activeGoal) {
-        setLoading(false);
-        return;
-      }
-
-      // 2. Then, fetch ONLY the roadmap tasks linked to that specific goal
-      const { data, error } = await supabase
-        .from('ai_roadmap')
-        .select('*')
-        .eq('goal_id', activeGoal.id)
-        .order('id', { ascending: true }); // Keeps Day 1 at the top
-
-      if (error) {
-        console.error("Error fetching roadmap:", error);
-      } else if (data) {
-        setTasks(data);
-      }
+  // 1. Pulled fetchRoadmap OUTSIDE of the useEffect so the whole component can use it
+  const fetchRoadmap = async () => {
+    if (!userId) {
       setLoading(false);
+      return;
     }
 
+    // First, find the user's active goal
+    const { data: activeGoal } = await supabase
+      .from('goals')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+
+    if (!activeGoal) {
+      setLoading(false);
+      return;
+    }
+
+    // Fetch ONLY the roadmap tasks linked to that specific goal
+    const { data, error } = await supabase
+      .from('ai_roadmap')
+      .select('*')
+      .eq('goal_id', activeGoal.id); 
+
+    if (error) {
+      console.error("Error fetching roadmap:", error);
+    } else if (data) {
+      // Force sort mathematically by extracting the number from "Day X"
+      const sortedTasks = data.sort((a, b) => {
+        const numA = parseInt(a.timeframe.replace(/[^0-9]/g, '')) || 0;
+        const numB = parseInt(b.timeframe.replace(/[^0-9]/g, '')) || 0;
+        return numA - numB;
+      });
+      setTasks([...sortedTasks]);
+    }
+    setLoading(false);
+  }
+
+  // 2. useEffect now simply calls the function when the component loads
+  useEffect(() => {
     fetchRoadmap()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
+  
+  const handleTaskComplete = async (task: any) => {
+    // Prevent clicking locked tasks
+    if (task.status !== 'active') return;
+
+    // Mark the clicked task as completed
+    await supabase.from('ai_roadmap').update({ status: 'completed' }).eq('id', task.id);
+
+    // Find the next day's task and unlock it
+    const currentDayNum = parseInt(task.timeframe.replace(/[^0-9]/g, ''));
+    const nextTask = tasks.find((t: any) => parseInt(t.timeframe.replace(/[^0-9]/g, '')) === currentDayNum + 1);
+
+    if (nextTask) {
+      await supabase.from('ai_roadmap').update({ status: 'active' }).eq('id', nextTask.id);
+    }
+
+    // 3. Refresh the UI successfully because fetchRoadmap is in scope!
+    fetchRoadmap();
+  };
 
   if (loading) {
     return <div className="mt-8 text-gray-500 animate-pulse">Loading your AI roadmap...</div>
@@ -65,12 +95,12 @@ export default function RoadmapDisplay({ userId }: { userId: string }) {
             key={task.id} 
             className={`p-3 border rounded-md flex items-start gap-3 transition-opacity ${task.status === 'locked' ? 'opacity-50 bg-gray-50' : 'bg-white shadow-sm'}`}
           >
-            <input 
-              type="checkbox" 
-              className="mt-1 w-4 h-4 text-blue-600 rounded cursor-pointer"
-              checked={task.status === 'completed'} 
-              readOnly 
-              disabled={task.status === 'locked'}
+            <input
+               type="checkbox"
+               checked={task.status === 'completed'}
+               disabled={task.status === 'locked'}
+               onChange={() => handleTaskComplete(task)}
+               className="w-5 h-5 text-blue-600 border-gray-300 rounded-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex-shrink-0 mt-0.5"
             />
             <div>
               <p className="font-semibold text-gray-900">
