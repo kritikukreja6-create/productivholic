@@ -38,7 +38,7 @@ export async function generateRoadmap(goalTitle: string, userId: string, duratio
     const goalId = newGoal.id;
 
     // 2. Prompt Gemini dynamically based on the selected days
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
     const prompt = `
       A user has the following goal: "${goalTitle}".
       Break this goal down into a ${duration}-day actionable roadmap.
