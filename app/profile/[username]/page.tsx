@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
+import EditProfile from '@/components/EditProfile';
 
 export default async function ProfilePage({
   params,
@@ -89,9 +90,20 @@ export default async function ProfilePage({
         {/* Profile Header */}
         <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-6">
-            <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-3xl font-black border border-blue-100 shadow-inner">
-              {username.charAt(0).toUpperCase()}
-            </div>
+            
+            {/* UPDATED: Avatar Display Logic */}
+            {profile.avatar_url ? (
+              <img 
+                src={profile.avatar_url} 
+                alt={`${username}'s avatar`} 
+                className="w-20 h-20 rounded-full object-cover border-2 border-blue-100 shadow-sm"
+              />
+            ) : (
+              <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-3xl font-black border border-blue-100 shadow-inner">
+                {username.charAt(0).toUpperCase()}
+              </div>
+            )}
+
             <div>
               <h1 className="text-3xl font-black text-gray-900 tracking-tight">
                 @{username}
@@ -226,6 +238,12 @@ export default async function ProfilePage({
             </div>
           )}
         </div>
+
+        {/* NEW: Edit Profile Component */}
+        <div className="pt-6">
+          <EditProfile userId={profile.id} />
+        </div>
+        
       </div>
     </main>
   );

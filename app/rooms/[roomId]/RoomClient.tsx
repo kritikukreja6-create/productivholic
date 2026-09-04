@@ -63,8 +63,20 @@ export default function RoomClient({ roomId }: { roomId: string }) {
       {/* 2. Right Sidebar: Timer & Chat */}
       <div className="flex flex-col gap-6 h-[600px]">
         
-        {/* Pomodoro Timer */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center flex-shrink-0">
+        {/* Pomodoro Timer & Invite Button */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center flex-shrink-0 relative">
+          
+          {/* NEW: Copy Link Button */}
+          <button 
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href);
+              alert("Invite link copied to clipboard!");
+            }}
+            className="absolute top-4 right-4 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100 transition"
+          >
+            Copy Invite Link
+          </button>
+
           <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Focus Room</h2>
           <div className="text-6xl font-black text-gray-900 tracking-tighter">
             {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
@@ -88,7 +100,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Encourage the room..."
-              className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm outline-none"
+              className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white outline-none"
             />
           </form>
         </div>

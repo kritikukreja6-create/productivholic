@@ -7,17 +7,19 @@ export default function GoalCreator({ userId, onRoadmapCreated }: { userId: stri
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    const result = await generateRoadmap(goal, userId)
-    setLoading(false)
+    e.preventDefault();
+    setLoading(true);
+    
+    const result = await generateRoadmap(goal, userId);
+    setLoading(false);
 
     if (result.success) {
-      alert('Roadmap generated successfully! Time to get to work.')
-      setGoal('')
-      if (onRoadmapCreated) onRoadmapCreated() // Triggers instant UI update
+      alert('Roadmap generated successfully! Time to get to work.');
+      setGoal('');
+      if (onRoadmapCreated) onRoadmapCreated(); 
     } else {
-      alert('Failed to generate roadmap. Try again.')
+      // Prioritize the custom backend message, fallback to generic error
+      alert(result.message || 'Failed to generate roadmap. Try again.');
     }
   }
 

@@ -17,18 +17,32 @@ export default function RoadmapDisplay({ userId }: { userId: string }) {
     if (!userId) return
 
     const fetchRoadmap = async () => {
+      // 1. First, find the user's active goal
+      const { data: activeGoal } = await supabase
+        .from('goals')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .single();
+
+      if (!activeGoal) {
+        setLoading(false);
+        return;
+      }
+
+      // 2. Then, fetch ONLY the roadmap tasks linked to that specific goal
       const { data, error } = await supabase
         .from('ai_roadmap')
         .select('*')
-        .eq('user_id', userId)
-       
+        .eq('goal_id', activeGoal.id)
+        .order('id', { ascending: true }); // Keeps Day 1 at the top
 
       if (error) {
-        console.error("Error fetching roadmap:", error)
+        console.error("Error fetching roadmap:", error);
       } else if (data) {
-        setTasks(data)
+        setTasks(data);
       }
-      setLoading(false)
+      setLoading(false);
     }
 
     fetchRoadmap()

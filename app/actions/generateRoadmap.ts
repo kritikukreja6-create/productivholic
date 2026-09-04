@@ -9,13 +9,41 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function generateRoadmap(goalTitle: string, userId: string) {
   try {
-    // 1. Setup the model and force JSON output
-    const model = genAI.getGenerativeModel({
-  model: "gemini-2.5-flash",
-  generationConfig: { responseMimeType: "application/json" }
-});
+    // 1. Initialize Supabase FIRST so we can check the database before calling AI
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) { return cookieStore.get(name)?.value },
+          set(name: string, value: string, options: any) { cookieStore.set(name, value, options) },
+          remove(name: string, options: any) { cookieStore.delete(name) }
+        },
+      }
+    );
 
-    // 2. The Prompt
+    // 2. Check for Duplicates: Is this exact goal already active?
+    const { data: existingGoal } = await supabase
+      .from('goals')
+      .select('id')
+      .eq('user_id', userId)
+      .ilike('title', goalTitle) // case-insensitive check
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (existingGoal) {
+      // Block generation instantly and return your custom message
+      return { success: false, message: 'This goal is already going on.' };
+    }
+
+    // 3. Setup the model and force JSON output
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      generationConfig: { responseMimeType: "application/json" }
+    });
+
+    // 4. The Prompt
     const prompt = `
       You are an expert productivity coach. 
       A user has the following goal: "${goalTitle}".
@@ -29,45 +57,42 @@ export async function generateRoadmap(goalTitle: string, userId: string) {
       Make sure there are exactly 30 items in the array.
     `;
 
-    // 3. Call Gemini
-   const result = await model.generateContent(prompt);
-   const responseText = result.response.text();
-   const roadmapTasks = JSON.parse(responseText);
+    // 5. Call Gemini
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+    const roadmapTasks = JSON.parse(responseText);
 
-    // 5. Initialize Supabase
-    // 5. Initialize Supabase
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-    
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-        get(name: string) { return cookieStore.get(name)?.value },
-        set(name: string, value: string, options: any) { cookieStore.set(name, value, options) },
-        remove(name: string, options: any) { cookieStore.delete(name) }
-      },
-      }
-    );
 
-    // 6. Format the data for Supabase
-    // We only make the very first task 'active', the rest are 'locked'
+  // 1. Fetch the ID of the goal the user just made active
+    const { data: activeGoal } = await supabase
+      .from('goals')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+
+    if (!activeGoal) {
+      return { success: false, message: "No active goal found to attach roadmap to." };
+    }
+
+    // 2. Format the data to include 'goal_id'
     const tasksToInsert = roadmapTasks.map((task: any, index: number) => ({
       user_id: userId,
+      goal_id: activeGoal.id, // <--- Links the tasks to the specific goal
       timeframe: task.timeframe,
       task_title: task.task_title,
       status: index === 0 ? 'active' : 'locked', 
     }));
 
-    // 7. Bulk Insert into the database
-    const { error } = await supabase.from('ai_roadmap').insert(tasksToInsert);
+    // 3. Bulk Insert into the database
+    const { error: insertError } = await supabase.from('ai_roadmap').insert(tasksToInsert);
 
-    if (error) throw error;
+    if (insertError) throw insertError;
 
     return { success: true };
 
   } catch (error) {
     console.error("Roadmap generation error:", error);
-    return { success: false, error: "Failed to generate roadmap" };
+    return { success: false, message: "Failed to generate roadmap" };
   }
 }

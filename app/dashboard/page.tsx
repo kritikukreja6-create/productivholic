@@ -6,7 +6,7 @@ import GoalCreator from '@/components/GoalCreator';
 import RoadmapDisplay from '@/components/RoadmapDisplay';
 import Link from 'next/link';
 import LogoutButton from '@/components/LogoutButton';
-
+import CreatePrivateRoom from '@/components/CreatePrivateRoom';
 
 export default function Dashboard() {
   const supabase = createBrowserClient(
@@ -287,6 +287,7 @@ if (onboardingData?.field_of_interest_id) {
           </button>
         </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <CreatePrivateRoom />
             {suggestedGroups.length === 0 ? (
               <div className="col-span-full text-gray-500 italic">No groups available for your interest yet.</div>
             ) : (
