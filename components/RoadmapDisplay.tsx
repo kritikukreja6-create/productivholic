@@ -90,20 +90,22 @@ export default function RoadmapDisplay({ userId }: { userId: string }) {
 
   return (
     <div className="mt-8 space-y-10">
-      {/* Map through each individual goal to create separate boxes */}
       {goals.map((goal) => {
-        // Filter tasks to only show the ones belonging to this specific box
+        // STRICT FILTER: Only grab tasks that belong to THIS specific goal's ID
         const goalTasks = tasks.filter(t => t.goal_id === goal.id);
 
+        // If a goal doesn't have tasks yet, don't show an empty box
+        if (goalTasks.length === 0) return null;
+
         return (
-          <div key={goal.id} className="bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h2 className="text-xl font-bold mb-4 text-gray-900">{goal.title}</h2>
+          <div key={goal.id} className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm">
+            <h2 className="text-xl font-bold mb-6 text-gray-900">{goal.title}</h2>
             
             <ul className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
               {goalTasks.map((task) => (
                 <li 
                   key={task.id} 
-                  className={`p-3 border rounded-md flex items-start gap-3 transition-opacity ${task.status === 'locked' ? 'opacity-50 bg-gray-100 border-gray-200' : 'bg-white shadow-sm border-gray-300'}`}
+                  className={`p-3 border rounded-md flex items-start gap-3 transition-all ${task.status === 'locked' ? 'opacity-50 bg-gray-50 border-gray-100' : 'bg-white shadow-sm border-gray-200'}`}
                 >
                   <input
                      type="checkbox"
