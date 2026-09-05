@@ -79,10 +79,6 @@ export default async function ProfilePage({
   return (
     <main className="min-h-screen bg-gray-50 p-6 md:p-12 text-gray-800">
       <div className="max-w-4xl mx-auto space-y-8">
-        
-        <Link href="/dashboard" className="text-blue-600 hover:text-blue-800 transition font-semibold text-sm flex items-center gap-2 w-fit">
-          &larr; Back to Mission Control
-        </Link>
 
         {/* Centered Profile Header with XP Gamification */}
         <div className="bg-white p-10 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center relative overflow-hidden">

@@ -6,10 +6,10 @@ import { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import GoalCreator from '@/components/GoalCreator';
 import RoadmapDisplay from '@/components/RoadmapDisplay';
-import Link from 'next/link';
 import LogoutButton from '@/components/LogoutButton';
 import CreatePrivateRoom from '@/components/CreatePrivateRoom';
 import { quickPlan } from '@/app/actions/quickPlan';
+import EveningReflection from '@/components/EveningReflection';
 
 export default function Dashboard() {
   const supabase = createBrowserClient(
@@ -29,6 +29,7 @@ export default function Dashboard() {
   
   // Quick Capture State
   const [quickTask, setQuickTask] = useState('');
+  const [isPlanning, setIsPlanning] = useState(false);
 
   // Matchmaking State
   const [suggestedGroups, setSuggestedGroups] = useState<any[]>([]);
@@ -142,31 +143,28 @@ export default function Dashboard() {
     }
   };
 
-  const [isPlanning, setIsPlanning] = useState(false);
-
-const handleQuickCapture = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!quickTask.trim() || !userId) return;
-  
-  setIsPlanning(true);
-  
-  // Call the Gemini server action
-  const result = await quickPlan(quickTask, userId);
-  
-  if (result.success) {
-    setQuickTask('');
-    // Refresh the dashboard to instantly show the new task in "Today's Mission"
-    await fetchDashboardData(); 
-  } else {
-    alert("Failed to plan task. Please try again.");
-  }
-  
-  setIsPlanning(false);
-};
+  const handleQuickCapture = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickTask.trim() || !userId) return;
+    
+    setIsPlanning(true);
+    
+    const result = await quickPlan(quickTask, userId);
+    
+    if (result.success) {
+      setQuickTask('');
+      await fetchDashboardData(); 
+    } else {
+      alert("Failed to plan task. Please try again.");
+    }
+    
+    setIsPlanning(false);
+  };
 
   return (
     <main className="min-h-screen bg-gray-50/50 p-6 md:p-12 text-gray-900 relative">
       {userId && <OnboardingModal userId={userId} />}
+      <EveningReflection />
 
       <div className="max-w-5xl mx-auto space-y-8">
         
@@ -179,17 +177,11 @@ const handleQuickCapture = async (e: React.FormEvent) => {
             <p className="text-gray-500 mt-1 font-medium">Ready to crush your goals today?</p>
           </div>
           <div className="flex items-center gap-3">
-            <Link
-              href={username ? `/profile/${username}` : '#'}
-              className="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition shadow-sm text-sm"
-            >
-              My Profile
-            </Link>
             <LogoutButton />
           </div>
         </div>
 
-        {/* TOP METRICS (Placeholder for XP & Streak System) */}
+        {/* TOP METRICS */}
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center">
             <span className="text-3xl font-black text-blue-600">
@@ -224,10 +216,10 @@ const handleQuickCapture = async (e: React.FormEvent) => {
                   <p className="text-blue-100 mb-8 font-medium">Estimated Focus: 25 mins • {nextTask.timeframe}</p>
                   
                   <button 
-                   onClick={() => router.push(`/focus/${nextTask.id}`)}
-                  className="w-full sm:w-auto px-8 py-4 bg-white text-blue-700 rounded-xl font-black text-lg hover:bg-blue-50 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    onClick={() => router.push(`/focus/${nextTask.id}`)}
+                    className="w-full sm:w-auto px-8 py-4 bg-white text-blue-700 rounded-xl font-black text-lg hover:bg-blue-50 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                   >
-                ▶ Start Focus Session
+                    ▶ Start Focus Session
                   </button>
                 </div>
               ) : (
@@ -250,19 +242,16 @@ const handleQuickCapture = async (e: React.FormEvent) => {
                   className="flex-1 bg-gray-50 border border-gray-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
                 />
                 <button 
-                 type="submit" 
-                 disabled={isPlanning || !quickTask}
-                 className="px-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition disabled:opacity-50 min-w-[120px]"
+                  type="submit" 
+                  disabled={isPlanning || !quickTask}
+                  className="px-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition disabled:opacity-50 min-w-[120px]"
                 >
-                {isPlanning ? 'Thinking...' : 'Plan It'}
-                </button>
-                <button type="submit" className="px-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition">
-                  Plan It
+                  {isPlanning ? 'Thinking...' : 'Plan It'}
                 </button>
               </form>
             </div>
             
-            {/* AI ROADMAP GENERATOR (Moved to bottom of primary column) */}
+            {/* AI ROADMAP GENERATOR */}
             {userId && (
               <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mt-8">
                 <h2 className="text-xl font-bold mb-6 text-gray-900">Generate New Roadmap</h2>

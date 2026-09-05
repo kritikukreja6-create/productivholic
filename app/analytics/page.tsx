@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import Link from 'next/link';
 import { getInsight } from '@/app/actions/getInsight';
 
 export default function AnalyticsPage() {
@@ -79,11 +78,8 @@ export default function AnalyticsPage() {
     <main className="min-h-screen bg-gray-50 p-6 md:p-12 text-gray-900">
       <div className="max-w-4xl mx-auto space-y-8">
         
-        <div className="flex justify-between items-center pb-4 border-b border-gray-200">
-          <h1 className="text-3xl font-black tracking-tight">Performance Analytics</h1>
-          <Link href="/dashboard" className="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition shadow-sm text-sm">
-            Back to Dashboard
-          </Link>
+        <div className="pb-4 border-b border-gray-200">
+          <h1 className="text-3xl font-black tracking-tight text-gray-900">Performance Analytics</h1>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
