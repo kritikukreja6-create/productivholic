@@ -21,7 +21,18 @@ export async function generateRoadmap(goalTitle: string, userId: string, duratio
       }
     );
 
-    // 1. SMART DUPLICATE CHECK: Ask Gemini if the goal already exists
+    // 1. Fetch user context to make tasks highly relevant
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('course, skills')
+      .eq('id', userId)
+      .single();
+
+    const userContext = profile 
+      ? `The user's background: studying ${profile.course || 'their coursework'} with specific skills in ${profile.skills || 'their field'}.` 
+      : '';
+
+    // 2. SMART DUPLICATE CHECK
     const { data: existingGoals } = await supabase
       .from('goals')
       .select('title')
@@ -47,7 +58,7 @@ export async function generateRoadmap(goalTitle: string, userId: string, duratio
       }
     }
 
-    // 2. Create the goal with the dynamic duration
+    // 3. Create the goal
     const { data: newGoal, error: goalError } = await supabase
       .from('goals')
       .insert({
@@ -63,16 +74,22 @@ export async function generateRoadmap(goalTitle: string, userId: string, duratio
     if (goalError) throw goalError;
     const goalId = newGoal.id;
 
-    // 3. Prompt Gemini dynamically based on the selected days
+    // 4. Prompt Gemini dynamically with strict isolation rules
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
     const prompt = `
-      A user has the following goal: "${goalTitle}".
-      Break this goal down into a ${duration}-day actionable roadmap.
+      ${userContext}
+      A user has committed to this ${duration}-day goal: "${goalTitle}".
+      Break this goal down into a strictly sequenced ${duration}-day actionable roadmap.
+
+      CRITICAL RULE: Each daily task will be displayed in isolation on their "Today's Mission" dashboard. 
+      Therefore, EVERY single 'task_title' MUST be highly specific and explicitly reference the main goal. 
+      Do NOT write generic tasks like "Read documentation" or "Set up environment". 
+      Instead, write "Read documentation for ${goalTitle}" or "Set up development environment for ${goalTitle} utilizing [their skills]".
 
       You MUST output a JSON array of objects exactly matching this schema:
       [
-        { "timeframe": "Day 1", "task_title": "Clear and specific task" },
-        { "timeframe": "Day 2", "task_title": "Clear and specific task" }
+        { "timeframe": "Day 1", "task_title": "Clear, goal-specific task" },
+        { "timeframe": "Day 2", "task_title": "Clear, goal-specific task" }
       ]
       Make sure there are exactly ${duration} items in the array. Do not include markdown code blocks like \`\`\`json, just output the raw JSON array string.
     `;
@@ -83,7 +100,7 @@ export async function generateRoadmap(goalTitle: string, userId: string, duratio
     const cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
     const roadmapTasks = JSON.parse(cleanedText);
 
-    // 4. Format and Insert tasks
+    // 5. Format and Insert tasks
     const tasksToInsert = roadmapTasks.map((task: any, index: number) => ({
       user_id: userId,
       goal_id: goalId, 

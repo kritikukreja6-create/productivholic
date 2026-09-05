@@ -30,27 +30,23 @@ export default function AnalyticsPage() {
       const { data: roadmap } = await supabase.from('ai_roadmap').select('status').eq('user_id', user.id);
       const tasksCompleted = roadmap?.filter(t => t.status === 'completed').length || 0;
 
-      // Fetch Daily Logs (Last 7 Days)
-      const today = new Date();
-      const pastWeek = new Date(today);
-      pastWeek.setDate(pastWeek.getDate() - 7);
+     // --- FIXED DATE LOGIC ---
+      const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (6 - i));
+        const offset = d.getTimezoneOffset() * 60000;
+        return new Date(d.getTime() - offset).toISOString().split('T')[0];
+      });
       
       const { data: logs } = await supabase
         .from('daily_logs')
         .select('log_date')
         .eq('user_id', user.id)
-        .gte('log_date', pastWeek.toISOString().split('T')[0]);
+        .gte('log_date', last7Days[0]); 
 
-      // Calculate 7-Day Activity Array
-      const activityMap = Array(7).fill(false);
-      if (logs) {
-        logs.forEach(log => {
-          const logDate = new Date(log.log_date);
-          const diffTime = Math.abs(today.getTime() - logDate.getTime());
-          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-          if (diffDays < 7) activityMap[6 - diffDays] = true; 
-        });
-      }
+      const loggedDates = new Set(logs?.map(log => log.log_date) || []);
+      const activityMap = last7Days.map(dateStr => loggedDates.has(dateStr));
+      // ------------------------
 
       // Calculate Focus Score (Base 40 + XP/Tasks scaling, max 100)
       const calculatedScore = Math.min(100, 40 + (tasksCompleted * 5) + (activeCount * 2));
