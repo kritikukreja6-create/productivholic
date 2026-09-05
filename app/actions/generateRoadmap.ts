@@ -21,7 +21,33 @@ export async function generateRoadmap(goalTitle: string, userId: string, duratio
       }
     );
 
-    // 1. Create the goal with the dynamic duration selected by the user
+    // 1. SMART DUPLICATE CHECK: Ask Gemini if the goal already exists
+    const { data: existingGoals } = await supabase
+      .from('goals')
+      .select('title')
+      .eq('user_id', userId)
+      .eq('is_active', true);
+
+    if (existingGoals && existingGoals.length > 0) {
+      const existingTitles = existingGoals.map(g => g.title).join(", ");
+      
+      const checkModel = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+      const checkPrompt = `
+        A user wants to add a new goal: "${goalTitle}".
+        They already have these active goals: [${existingTitles}].
+        Is the new goal fundamentally the exact same thing as any of the existing goals (even if phrased slightly differently)? 
+        Reply ONLY with the word "YES" or "NO".
+      `;
+      
+      const checkResult = await checkModel.generateContent(checkPrompt);
+      const isDuplicate = checkResult.response.text().trim().toUpperCase();
+
+      if (isDuplicate.includes("YES")) {
+        return { success: false, message: "You already have an active goal that is too similar to this one!" };
+      }
+    }
+
+    // 2. Create the goal with the dynamic duration
     const { data: newGoal, error: goalError } = await supabase
       .from('goals')
       .insert({
@@ -37,7 +63,7 @@ export async function generateRoadmap(goalTitle: string, userId: string, duratio
     if (goalError) throw goalError;
     const goalId = newGoal.id;
 
-    // 2. Prompt Gemini dynamically based on the selected days
+    // 3. Prompt Gemini dynamically based on the selected days
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
     const prompt = `
       A user has the following goal: "${goalTitle}".
@@ -57,7 +83,7 @@ export async function generateRoadmap(goalTitle: string, userId: string, duratio
     const cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
     const roadmapTasks = JSON.parse(cleanedText);
 
-    // 3. Format tasks
+    // 4. Format and Insert tasks
     const tasksToInsert = roadmapTasks.map((task: any, index: number) => ({
       user_id: userId,
       goal_id: goalId, 
@@ -66,7 +92,6 @@ export async function generateRoadmap(goalTitle: string, userId: string, duratio
       status: index === 0 ? 'active' : 'locked', 
     }));
 
-    // 4. Insert into database
     const { error: insertError } = await supabase.from('ai_roadmap').insert(tasksToInsert);
 
     if (insertError) throw insertError;

@@ -30,7 +30,6 @@ export default async function ProfilePage({
     .eq('username', username)
     .maybeSingle();
 
-  // Custom 404 state if profile is not found
   if (!profile) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-800 p-6">
@@ -64,22 +63,16 @@ export default async function ProfilePage({
   const activeGoals = goals?.filter((g) => g.is_active) || [];
   const queuedGoals = goals?.filter((g) => !g.is_active) || [];
 
-  // Calculate Roadmap stats & completion percentage
   const totalTasks = roadmap?.length || 0;
-  const completedTasks =
-    roadmap?.filter((t) => t.status === 'completed')?.length || 0;
-  const completionPercentage =
-    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const completedTasks = roadmap?.filter((t) => t.status === 'completed')?.length || 0;
+  const completionPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  // Find next queued task
-  const nextTask = roadmap?.find(
-    (t) => t.status === 'active' || t.status === 'locked'
-  );
+  const nextTask = roadmap?.find((t) => t.status === 'active' || t.status === 'locked');
 
   return (
     <main className="min-h-screen bg-gray-50 p-6 md:p-12 text-gray-800">
       <div className="max-w-4xl mx-auto space-y-8">
-        {/* Navigation Link */}
+        
         <Link
           href="/dashboard"
           className="text-blue-600 hover:text-blue-800 transition font-semibold text-sm flex items-center gap-2 w-fit"
@@ -87,48 +80,62 @@ export default async function ProfilePage({
           &larr; Back to Dashboard
         </Link>
 
-        {/* Profile Header */}
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="flex items-center gap-6">
-            
-            {/* UPDATED: Avatar Display Logic */}
+        {/* Centered Profile Header */}
+        <div className="bg-white p-10 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center relative">
+          
+          {/* Floating Points Badge */}
+          <div className="absolute top-6 right-6 bg-blue-50/60 px-4 py-2 rounded-xl border border-blue-100 text-center hidden md:block">
+            <div className="text-2xl font-black text-blue-600">{totalPoints}</div>
+            <div className="text-[10px] text-blue-500 font-bold uppercase tracking-wider mt-0.5">
+              Lifetime Points
+            </div>
+          </div>
+
+          {/* Large Centered Avatar */}
+          <div className="w-28 h-28 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 text-5xl font-black border-4 border-white shadow-md mb-4 overflow-hidden ring-2 ring-blue-100">
             {profile.avatar_url ? (
               <img 
                 src={profile.avatar_url} 
                 alt={`${username}'s avatar`} 
-                className="w-20 h-20 rounded-full object-cover border-2 border-blue-100 shadow-sm"
+                className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-3xl font-black border border-blue-100 shadow-inner">
-                {username.charAt(0).toUpperCase()}
-              </div>
+              username.charAt(0).toUpperCase()
             )}
-
-            <div>
-              <h1 className="text-3xl font-black text-gray-900 tracking-tight">
-                @{username}
-              </h1>
-              <p className="text-blue-600 font-semibold text-sm mt-0.5">
-                {profile.college || 'Guru Tegh Bahadur Institute of Technology'}
-              </p>
-              <p className="text-gray-500 text-sm mt-2 max-w-lg">
-                {profile.bio ||
-                  'B.Tech CSE Student | Full-Stack Web Development & DSA Problem Solving'}
-              </p>
-            </div>
           </div>
 
-          <div className="bg-blue-50/60 px-6 py-4 rounded-xl border border-blue-100 text-center min-w-[140px]">
-            <div className="text-3xl font-black text-blue-600">{totalPoints}</div>
-            <div className="text-xs text-blue-500 font-bold uppercase tracking-wider mt-0.5">
-              Lifetime Points
+          {/* Dynamic User Data */}
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+            @{username}
+          </h1>
+          
+          {profile.college ? (
+            <p className="text-blue-600 font-bold text-lg mt-2">
+              {profile.college}
+            </p>
+          ) : (
+            <p className="text-blue-600 font-bold text-lg mt-2">Guru Tegh Bahadur Institute of Technology</p>
+          )}
+
+          <p className="text-gray-500 font-medium text-sm mt-1">
+            {profile.course || 'B.Tech CSE Student'} {profile.year ? `• ${profile.year}` : ''}
+          </p>
+
+          {profile.skills ? (
+            <div className="mt-4 bg-gray-50 px-4 py-1.5 rounded-full border border-gray-200 inline-block">
+              <p className="text-gray-700 text-sm font-semibold">
+                Skills: <span className="text-gray-500 font-medium">{profile.skills}</span>
+              </p>
             </div>
-          </div>
+          ) : (
+            <p className="text-gray-500 text-sm mt-3 max-w-lg">
+              Full-Stack Web Development & DSA Problem Solving
+            </p>
+          )}
         </div>
 
         {/* Progress & Highlights Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Progress Card */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
             <div>
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
@@ -151,7 +158,6 @@ export default async function ProfilePage({
             </div>
           </div>
 
-          {/* Next Task Card */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 md:col-span-2 flex flex-col justify-between">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
               Next Up / Active Focus
@@ -184,25 +190,14 @@ export default async function ProfilePage({
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 {activeGoals.map((goal) => (
-                  <div
-                    key={goal.id}
-                    className="p-4 border border-gray-100 rounded-lg bg-gray-50/50 flex justify-between items-center"
-                  >
+                  <div key={goal.id} className="p-4 border border-gray-100 rounded-lg bg-gray-50/50 flex justify-between items-center">
                     <div>
-                      <h4 className="font-bold text-gray-900 text-sm">
-                        {goal.title}
-                      </h4>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {goal.duration_days} Day Challenge
-                      </p>
+                      <h4 className="font-bold text-gray-900 text-sm">{goal.title}</h4>
+                      <p className="text-xs text-gray-500 mt-0.5">{goal.duration_days} Day Challenge</p>
                     </div>
                     <div className="text-right">
-                      <span className="text-lg font-black text-blue-600">
-                        {goal.points}
-                      </span>
-                      <span className="text-xs text-gray-400 block uppercase font-bold">
-                        Pts
-                      </span>
+                      <span className="text-lg font-black text-blue-600">{goal.points}</span>
+                      <span className="text-xs text-gray-400 block uppercase font-bold">Pts</span>
                     </div>
                   </div>
                 ))}
@@ -217,21 +212,12 @@ export default async function ProfilePage({
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {queuedGoals.map((goal) => (
-                  <div
-                    key={goal.id}
-                    className="p-4 border border-gray-100 rounded-lg bg-gray-50/30 flex justify-between items-center opacity-75"
-                  >
+                  <div key={goal.id} className="p-4 border border-gray-100 rounded-lg bg-gray-50/30 flex justify-between items-center opacity-75">
                     <div>
-                      <h4 className="font-semibold text-gray-800 text-sm">
-                        {goal.title}
-                      </h4>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {goal.duration_days} Day Challenge (Queued)
-                      </p>
+                      <h4 className="font-semibold text-gray-800 text-sm">{goal.title}</h4>
+                      <p className="text-xs text-gray-400 mt-0.5">{goal.duration_days} Day Challenge (Queued)</p>
                     </div>
-                    <span className="text-xs bg-gray-100 text-gray-600 font-bold px-2 py-1 rounded">
-                      Upcoming
-                    </span>
+                    <span className="text-xs bg-gray-100 text-gray-600 font-bold px-2 py-1 rounded">Upcoming</span>
                   </div>
                 ))}
               </div>
@@ -239,8 +225,8 @@ export default async function ProfilePage({
           )}
         </div>
 
-        {/* NEW: Edit Profile Component */}
-        <div className="pt-6">
+        {/* Client-side Edit Profile Component handles the avatar upload */}
+        <div className="pt-2">
           <EditProfile userId={profile.id} />
         </div>
         
