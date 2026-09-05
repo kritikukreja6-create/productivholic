@@ -21,22 +21,27 @@ export default function Dashboard() {
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Goal State
+  // Goal & Mission State
   const [goals, setGoals] = useState<any[]>([]);
-  const [newGoalTitle, setNewGoalTitle] = useState('');
-  const [goalSelection, setGoalSelection] = useState('');
-  const [duration, setDuration] = useState(10);
-  const [loading, setLoading] = useState(false);
+  const [nextTask, setNextTask] = useState<any | null>(null);
   const [completedToday, setCompletedToday] = useState<Record<string, boolean>>({});
+  
+  // Quick Capture State
+  const [quickTask, setQuickTask] = useState('');
 
   // Matchmaking State
   const [suggestedGroups, setSuggestedGroups] = useState<any[]>([]);
   const [joinedGroupIds, setJoinedGroupIds] = useState<Set<string>>(new Set());
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
+
   const fetchDashboardData = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     setUserId(user.id);
@@ -47,13 +52,9 @@ export default function Dashboard() {
       .eq('id', user.id)
       .maybeSingle();
 
-    if (profileData?.username) {
-      setUsername(profileData.username);
-    }
+    if (profileData?.username) setUsername(profileData.username);
 
-    // 1. Fetch Goals & Penalties
-    await supabase.rpc('enforce_penalties', { user_uid: user.id });
-
+    // 1. Fetch Goals & Roadmap for Today's Mission
     const { data: goalsData } = await supabase
       .from('goals')
       .select('*')
@@ -66,6 +67,19 @@ export default function Dashboard() {
       const today = new Date().toISOString().split('T')[0];
       const goalIds = goalsData.map((g) => g.id);
 
+      // Find the absolute next active task for the "Today's Mission" banner
+      const { data: roadmapData } = await supabase
+        .from('ai_roadmap')
+        .select('*')
+        .eq('user_id', user.id)
+        .in('status', ['active', 'locked'])
+        .order('id', { ascending: true })
+        .limit(1);
+        
+      if (roadmapData && roadmapData.length > 0) {
+        setNextTask(roadmapData[0]);
+      }
+
       const { data: logsData } = await supabase
         .from('daily_logs')
         .select('goal_id')
@@ -75,9 +89,7 @@ export default function Dashboard() {
 
       if (logsData) {
         const statusMap: Record<string, boolean> = {};
-        logsData.forEach((log) => {
-          statusMap[log.goal_id] = true;
-        });
+        logsData.forEach((log) => { statusMap[log.goal_id] = true; });
         setCompletedToday(statusMap);
       }
     }
@@ -94,7 +106,6 @@ export default function Dashboard() {
         .from('focus_groups')
         .select('*')
         .eq('field_of_interest_id', onboardingData.field_of_interest_id);
-
       if (groupsData) setSuggestedGroups(groupsData);
     }
 
@@ -112,29 +123,6 @@ export default function Dashboard() {
     fetchDashboardData();
   }, []);
 
-  const handleCreateGoal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      const { error } = await supabase.from('goals').insert({
-        user_id: user.id,
-        title: newGoalTitle,
-        duration_days: duration,
-        points: 0,
-      });
-      if (!error) {
-        setNewGoalTitle('');
-        setGoalSelection('');
-        setDuration(10);
-        fetchDashboardData();
-      }
-    }
-    setLoading(false);
-  };
-
   const handleCheckIn = async (goalId: string, currentPoints: number) => {
     const today = new Date().toISOString().split('T')[0];
     const { error: logError } = await supabase
@@ -146,7 +134,6 @@ export default function Dashboard() {
         .from('goals')
         .update({ points: currentPoints + 10 })
         .eq('id', goalId);
-
       if (!pointError) {
         setCompletedToday((prev) => ({ ...prev, [goalId]: true }));
         fetchDashboardData();
@@ -154,211 +141,177 @@ export default function Dashboard() {
     }
   };
 
-  const handleJoinGroup = async (groupId: string) => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      const { error } = await supabase
-        .from('group_members')
-        .insert({ group_id: groupId, user_id: user.id });
-
-      if (!error) fetchDashboardData();
-    }
+  const handleQuickCapture = (e: React.FormEvent) => {
+    e.preventDefault();
+    alert(`AI processing: "${quickTask}"... (Routing to Focus Mode coming soon!)`);
+    setQuickTask('');
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8 text-gray-800 relative">
-      {/* Onboarding modal overlay for new user profiles */}
+    <main className="min-h-screen bg-gray-50/50 p-6 md:p-12 text-gray-900 relative">
       {userId && <OnboardingModal userId={userId} />}
 
-      <div className="max-w-5xl mx-auto space-y-12">
-        {/* TOP HEADER WITH PROFILE BUTTON */}
-        <div className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm border-b">
+      <div className="max-w-5xl mx-auto space-y-8">
+        
+        {/* HEADER: Personalized & Time-Aware */}
+        <div className="flex justify-between items-end pb-4 border-b border-gray-200">
           <div>
-            <h1 className="text-2xl font-bold">Productivity Dashboard</h1>
-            <p className="text-sm text-gray-500">
-              Track your goals and connect with your study groups.
-            </p>
+            <h1 className="text-3xl font-black tracking-tight text-gray-900">
+              {getGreeting()}, {username ? `@${username}` : 'there'} 👋
+            </h1>
+            <p className="text-gray-500 mt-1 font-medium">Ready to crush your goals today?</p>
           </div>
-
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link
               href={username ? `/profile/${username}` : '#'}
-              className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-semibold hover:bg-blue-100 transition"
+              className="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition shadow-sm text-sm"
             >
-              View My Profile &rarr;
+              My Profile
             </Link>
             <LogoutButton />
           </div>
         </div>
 
-        {/* TOP SECTION: Gamified Task Engine */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="md:col-span-1 bg-white p-6 rounded-lg shadow-md h-fit">
-            <h2 className="text-xl font-bold mb-4">Start a Challenge</h2>
-
-            <form onSubmit={handleCreateGoal} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">What is your goal?</label>
-                <select
-                  className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 mb-2 bg-white"
-                  value={goalSelection}
-                  onChange={(e) => {
-                    setGoalSelection(e.target.value);
-                    if (e.target.value !== 'custom') {
-                      setNewGoalTitle(e.target.value);
-                    } else {
-                      setNewGoalTitle('');
-                    }
-                  }}
-                  required
-                >
-                  <option value="" disabled>
-                    Select a trending goal...
-                  </option>
-                  <option value="Solve 20 DSA problems in C">Solve 20 DSA problems in C</option>
-                  <option value="Build a Full-Stack Next.js & Supabase App">
-                    Build a Full-Stack Next.js & Supabase App
-                  </option>
-                  <option value="Merge an SSoC Open Source PR">Merge an SSoC Open Source PR</option>
-                  <option value="Complete a Data Analysis project">
-                    Complete a Data Analysis project
-                  </option>
-                  <option value="custom">Other (Type a custom goal)</option>
-                </select>
-
-                {goalSelection === 'custom' && (
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g., Read 10 pages of a book"
-                    className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 animate-in fade-in slide-in-from-top-2"
-                    value={newGoalTitle}
-                    onChange={(e) => setNewGoalTitle(e.target.value)}
-                  />
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Duration</label>
-                <select
-                  className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 bg-white"
-                  value={duration}
-                  onChange={(e) => setDuration(Number(e.target.value))}
-                >
-                  <option value={10}>10 Days</option>
-                  <option value={15}>15 Days</option>
-                  <option value={20}>20 Days</option>
-                  <option value={30}>30 Days</option>
-                </select>
-              </div>
-              <button
-                type="submit"
-                disabled={loading || !newGoalTitle}
-                className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:opacity-50 transition"
-              >
-                {loading ? 'Starting...' : 'Commit to Goal'}
-              </button>
-            </form>
+        {/* TOP METRICS (Placeholder for XP & Streak System) */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center">
+            <span className="text-3xl font-black text-blue-600">
+              {goals.reduce((sum, g) => sum + (g.points || 0), 0)}
+            </span>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Total XP</span>
           </div>
-
-          <div className="md:col-span-2 space-y-4">
-            <h2 className="text-2xl font-bold">Your Active Goals</h2>
-            {goals.length === 0 ? (
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-dashed border-gray-300 text-center text-gray-500">
-                No active challenges right now. Set a goal to start earning points!
-              </div>
-            ) : (
-              goals.map((goal) => {
-                const isDone = completedToday[goal.id];
-                return (
-                  <div
-                    key={goal.id}
-                    className="bg-white p-6 rounded-lg shadow-md flex justify-between items-center border-l-4 border-blue-600"
-                  >
-                    <div className="space-y-2">
-                      <h3 className="text-lg font-bold">{goal.title}</h3>
-                      <p className="text-sm text-gray-500">{goal.duration_days} Day Challenge</p>
-                      <button
-                        disabled={isDone}
-                        onClick={() => handleCheckIn(goal.id, goal.points)}
-                        className={`px-4 py-1.5 rounded text-sm font-semibold transition ${
-                          isDone
-                            ? 'bg-green-100 text-green-700 cursor-default'
-                            : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                        }`}
-                      >
-                        {isDone ? '✓ Completed Today' : 'Daily Check-In (+10 pts)'}
-                      </button>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-3xl font-black text-blue-600">{goal.points}</div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide">Points</div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center">
+            <span className="text-3xl font-black text-green-600">🔥 1</span>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Day Streak</span>
+          </div>
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center">
+            <span className="text-3xl font-black text-purple-600">{Object.keys(completedToday).length}</span>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Tasks Done Today</span>
           </div>
         </div>
 
-        <hr className="border-gray-200" />
-
-        {/* MIDDLE SECTION: AI Roadmap Generator */}
-        {userId && (
-          <div>
-            <h2 className="text-2xl font-bold mb-6">AI-Powered Roadmap</h2>
-            <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-100">
-              <GoalCreator userId={userId} onRoadmapCreated={fetchDashboardData} />
-              <RoadmapDisplay userId={userId} />
-            </div>
-          </div>
-        )}
-
-        <hr className="border-gray-200" />
-
-        {/* BOTTOM SECTION: Community Matchmaking */}
-        <div>
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">Your Focus Rooms</h2>
-            <button
-              onClick={() => router.push('/explore')}
-              className="text-blue-600 hover:text-blue-800 font-semibold text-sm"
-            >
-              Explore More Rooms &rarr;
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <CreatePrivateRoom />
-            {suggestedGroups.length === 0 ? (
-              <div className="col-span-full text-gray-500 italic">
-                No groups available for your interest yet.
-              </div>
-            ) : (
-              suggestedGroups.map((group) => {
-                const hasJoined = joinedGroupIds.has(group.id);
-                return (
-                  <div
-                    key={group.id}
-                    className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 flex justify-between items-center"
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4">
+          
+          {/* LEFT COLUMN: The Daily Loop */}
+          <div className="md:col-span-2 space-y-6">
+            
+            {/* TODAY'S MISSION HERO CARD */}
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 rounded-3xl shadow-md text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-32 bg-white opacity-5 rounded-full blur-3xl -mr-16 -mt-16"></div>
+              
+              <h2 className="text-sm font-black text-blue-200 uppercase tracking-widest mb-4">🎯 Today's Mission</h2>
+              
+              {nextTask ? (
+                <div>
+                  <h3 className="text-3xl font-bold mb-2 leading-tight">{nextTask.task_title}</h3>
+                  <p className="text-blue-100 mb-8 font-medium">Estimated Focus: 25 mins • {nextTask.timeframe}</p>
+                  
+                  <button 
+                    onClick={() => alert("This will trigger the fullscreen Pomodoro Focus Mode in Phase 3!")}
+                    className="w-full sm:w-auto px-8 py-4 bg-white text-blue-700 rounded-xl font-black text-lg hover:bg-blue-50 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                   >
-                    <div>
-                      <h3 className="text-lg font-bold">{group.name}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{group.description}</p>
-                    </div>
+                    ▶ Start Focus Session
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <h3 className="text-2xl font-bold mb-2 leading-tight">Your schedule is clear.</h3>
+                  <p className="text-blue-100 mb-8 font-medium">Create a new goal below to generate your next AI roadmap.</p>
+                </div>
+              )}
+            </div>
 
-                    <button
-                      onClick={() =>
-                        hasJoined ? router.push(`/rooms/${group.id}`) : handleJoinGroup(group.id)
-                      }
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold text-sm transition"
-                    >
-                      {hasJoined ? 'Enter Chat ->' : 'Join Room'}
-                    </button>
-                  </div>
-                );
-              })
+            {/* QUICK CAPTURE */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">⚡ Quick AI Planner</h3>
+              <form onSubmit={handleQuickCapture} className="flex gap-3">
+                <input 
+                  type="text" 
+                  value={quickTask}
+                  onChange={(e) => setQuickTask(e.target.value)}
+                  placeholder="e.g., Have class till 2pm, need to solve 5 DSA questions tonight..." 
+                  className="flex-1 bg-gray-50 border border-gray-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                />
+                <button type="submit" className="px-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition">
+                  Plan It
+                </button>
+              </form>
+            </div>
+            
+            {/* AI ROADMAP GENERATOR (Moved to bottom of primary column) */}
+            {userId && (
+              <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mt-8">
+                <h2 className="text-xl font-bold mb-6 text-gray-900">Generate New Roadmap</h2>
+                <GoalCreator userId={userId} onRoadmapCreated={fetchDashboardData} />
+                <div className="mt-8">
+                  <RoadmapDisplay userId={userId} />
+                </div>
+              </div>
             )}
+          </div>
+
+          {/* RIGHT COLUMN: Secondary Info & Rooms */}
+          <div className="md:col-span-1 space-y-6">
+            
+            {/* ACTIVE GOALS LIST */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">Active Goals</h2>
+              {goals.length === 0 ? (
+                <p className="text-sm text-gray-500 italic">No active goals.</p>
+              ) : (
+                <div className="space-y-3">
+                  {goals.map((goal) => {
+                    const isDone = completedToday[goal.id];
+                    return (
+                      <div key={goal.id} className="p-4 rounded-xl border border-gray-100 bg-gray-50 flex flex-col gap-3">
+                        <div>
+                          <h4 className="font-bold text-gray-800 text-sm">{goal.title}</h4>
+                          <p className="text-xs text-gray-500 mt-0.5">{goal.duration_days} Day Challenge</p>
+                        </div>
+                        <button
+                          disabled={isDone}
+                          onClick={() => handleCheckIn(goal.id, goal.points)}
+                          className={`w-full py-2 rounded-lg text-sm font-bold transition ${
+                            isDone
+                              ? 'bg-green-100 text-green-700 cursor-default border border-green-200'
+                              : 'bg-white border border-gray-200 text-gray-700 hover:border-blue-300 hover:text-blue-600'
+                          }`}
+                        >
+                          {isDone ? '✓ Checked In' : '+10 XP Check-In'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* FOCUS ROOMS */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-bold text-gray-900">Live Focus Rooms</h2>
+              </div>
+              
+              <div className="space-y-3">
+                <CreatePrivateRoom />
+                {suggestedGroups.map((group) => {
+                  const hasJoined = joinedGroupIds.has(group.id);
+                  return (
+                    <div key={group.id} className="p-4 rounded-xl border border-gray-100 bg-gray-50">
+                      <h4 className="font-bold text-gray-800 text-sm">{group.name}</h4>
+                      <p className="text-xs text-gray-500 mt-1 mb-3">{group.description}</p>
+                      <button
+                        onClick={() => router.push(hasJoined ? `/rooms/${group.id}` : '#')}
+                        className="w-full py-2 bg-blue-50 text-blue-600 rounded-lg font-bold text-sm hover:bg-blue-100 transition"
+                      >
+                        {hasJoined ? 'Enter Room →' : 'Join Community'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
