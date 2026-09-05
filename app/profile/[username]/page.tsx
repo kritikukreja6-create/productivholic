@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
+// IMPORT YOUR NEW COMPONENT
+import AvatarUpload from '@/components/AvatarUpload'; 
 import EditProfile from '@/components/EditProfile';
 
 export default async function ProfilePage({
@@ -83,7 +85,6 @@ export default async function ProfilePage({
         {/* Centered Profile Header */}
         <div className="bg-white p-10 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center relative">
           
-          {/* Floating Points Badge */}
           <div className="absolute top-6 right-6 bg-blue-50/60 px-4 py-2 rounded-xl border border-blue-100 text-center hidden md:block">
             <div className="text-2xl font-black text-blue-600">{totalPoints}</div>
             <div className="text-[10px] text-blue-500 font-bold uppercase tracking-wider mt-0.5">
@@ -91,20 +92,15 @@ export default async function ProfilePage({
             </div>
           </div>
 
-          {/* Large Centered Avatar */}
-          <div className="w-28 h-28 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 text-5xl font-black border-4 border-white shadow-md mb-4 overflow-hidden ring-2 ring-blue-100">
-            {profile.avatar_url ? (
-              <img 
-                src={profile.avatar_url} 
-                alt={`${username}'s avatar`} 
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              username.charAt(0).toUpperCase()
-            )}
+          {/* USE THE NEW AVATAR COMPONENT HERE */}
+          <div className="mb-4">
+            <AvatarUpload 
+              userId={profile.id} 
+              username={username} 
+              initialAvatarUrl={profile.avatar_url} 
+            />
           </div>
 
-          {/* Dynamic User Data */}
           <h1 className="text-3xl font-black text-gray-900 tracking-tight">
             @{username}
           </h1>
@@ -224,12 +220,6 @@ export default async function ProfilePage({
             </div>
           )}
         </div>
-
-        {/* Client-side Edit Profile Component handles the avatar upload */}
-        <div className="pt-2">
-          <EditProfile userId={profile.id} />
-        </div>
-        
       </div>
     </main>
   );
