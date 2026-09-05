@@ -9,6 +9,7 @@ import RoadmapDisplay from '@/components/RoadmapDisplay';
 import Link from 'next/link';
 import LogoutButton from '@/components/LogoutButton';
 import CreatePrivateRoom from '@/components/CreatePrivateRoom';
+import { quickPlan } from '@/app/actions/quickPlan';
 
 export default function Dashboard() {
   const supabase = createBrowserClient(
@@ -141,11 +142,27 @@ export default function Dashboard() {
     }
   };
 
-  const handleQuickCapture = (e: React.FormEvent) => {
-    e.preventDefault();
-    alert(`AI processing: "${quickTask}"... (Routing to Focus Mode coming soon!)`);
+  const [isPlanning, setIsPlanning] = useState(false);
+
+const handleQuickCapture = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!quickTask.trim() || !userId) return;
+  
+  setIsPlanning(true);
+  
+  // Call the Gemini server action
+  const result = await quickPlan(quickTask, userId);
+  
+  if (result.success) {
     setQuickTask('');
-  };
+    // Refresh the dashboard to instantly show the new task in "Today's Mission"
+    await fetchDashboardData(); 
+  } else {
+    alert("Failed to plan task. Please try again.");
+  }
+  
+  setIsPlanning(false);
+};
 
   return (
     <main className="min-h-screen bg-gray-50/50 p-6 md:p-12 text-gray-900 relative">
@@ -207,10 +224,10 @@ export default function Dashboard() {
                   <p className="text-blue-100 mb-8 font-medium">Estimated Focus: 25 mins • {nextTask.timeframe}</p>
                   
                   <button 
-                    onClick={() => alert("This will trigger the fullscreen Pomodoro Focus Mode in Phase 3!")}
-                    className="w-full sm:w-auto px-8 py-4 bg-white text-blue-700 rounded-xl font-black text-lg hover:bg-blue-50 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                   onClick={() => router.push(`/focus/${nextTask.id}`)}
+                  className="w-full sm:w-auto px-8 py-4 bg-white text-blue-700 rounded-xl font-black text-lg hover:bg-blue-50 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                   >
-                    ▶ Start Focus Session
+                ▶ Start Focus Session
                   </button>
                 </div>
               ) : (
@@ -232,6 +249,13 @@ export default function Dashboard() {
                   placeholder="e.g., Have class till 2pm, need to solve 5 DSA questions tonight..." 
                   className="flex-1 bg-gray-50 border border-gray-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
                 />
+                <button 
+                 type="submit" 
+                 disabled={isPlanning || !quickTask}
+                 className="px-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition disabled:opacity-50 min-w-[120px]"
+                >
+                {isPlanning ? 'Thinking...' : 'Plan It'}
+                </button>
                 <button type="submit" className="px-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition">
                   Plan It
                 </button>
