@@ -7,7 +7,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import GoalCreator from '@/components/GoalCreator';
 import RoadmapDisplay from '@/components/RoadmapDisplay';
 import LogoutButton from '@/components/LogoutButton';
-import CreatePrivateRoom from '@/components/CreatePrivateRoom';
+import CreateRoomModal from '@/components/CreateRoomModal';
 import { quickPlan } from '@/app/actions/quickPlan';
 import EveningReflection from '@/components/EveningReflection';
 import useSWR from 'swr';
@@ -309,7 +309,7 @@ export default function Dashboard() {
               </div>
               
               <div className="space-y-3">
-                <CreatePrivateRoom />
+                <CreateRoomModal onRoomCreated={() => mutate()} />
                 {suggestedGroups?.map((group: any) => {
                   const hasJoined = joinedGroupIds?.has(group.id);
                   return (
