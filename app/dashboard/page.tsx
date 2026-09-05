@@ -2,7 +2,7 @@
 
 import OnboardingModal from '@/components/OnboardingModal';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import GoalCreator from '@/components/GoalCreator';
 import RoadmapDisplay from '@/components/RoadmapDisplay';
@@ -10,6 +10,7 @@ import LogoutButton from '@/components/LogoutButton';
 import CreatePrivateRoom from '@/components/CreatePrivateRoom';
 import { quickPlan } from '@/app/actions/quickPlan';
 import EveningReflection from '@/components/EveningReflection';
+import useSWR from 'swr';
 
 export default function Dashboard() {
   const supabase = createBrowserClient(
@@ -19,21 +20,9 @@ export default function Dashboard() {
 
   const router = useRouter();
 
-  const [username, setUsername] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-
-  // Goal & Mission State
-  const [goals, setGoals] = useState<any[]>([]);
-  const [nextTask, setNextTask] = useState<any | null>(null);
-  const [completedToday, setCompletedToday] = useState<Record<string, boolean>>({});
-  
-  // Quick Capture State
+  // Quick Capture State (Kept local since it's just for the input field)
   const [quickTask, setQuickTask] = useState('');
   const [isPlanning, setIsPlanning] = useState(false);
-
-  // Matchmaking State
-  const [suggestedGroups, setSuggestedGroups] = useState<any[]>([]);
-  const [joinedGroupIds, setJoinedGroupIds] = useState<Set<string>>(new Set());
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -42,11 +31,10 @@ export default function Dashboard() {
     return 'Good evening';
   };
 
-  const fetchDashboardData = async () => {
+  // The SWR Fetcher Function: Gathers all dashboard data into one cached object
+  const fetcher = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    setUserId(user.id);
+    if (!user) throw new Error('Not authenticated');
 
     const { data: profileData } = await supabase
       .from('profiles')
@@ -54,9 +42,6 @@ export default function Dashboard() {
       .eq('id', user.id)
       .maybeSingle();
 
-    if (profileData?.username) setUsername(profileData.username);
-
-    // 1. Fetch Goals & Roadmap for Today's Mission
     const { data: goalsData } = await supabase
       .from('goals')
       .select('*')
@@ -64,12 +49,14 @@ export default function Dashboard() {
       .eq('is_active', true)
       .order('created_at', { ascending: false });
 
-    if (goalsData) {
-      setGoals(goalsData);
-      const today = new Date().toISOString().split('T')[0];
-      const goalIds = goalsData.map((g) => g.id);
+    const goals = goalsData || [];
+    let nextTask = null;
+    const completedToday: Record<string, boolean> = {};
 
-      // Find the absolute next active task for the "Today's Mission" banner
+    if (goals.length > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      const goalIds = goals.map((g) => g.id);
+
       const { data: roadmapData } = await supabase
         .from('ai_roadmap')
         .select('*')
@@ -79,7 +66,7 @@ export default function Dashboard() {
         .limit(1);
         
       if (roadmapData && roadmapData.length > 0) {
-        setNextTask(roadmapData[0]);
+        nextTask = roadmapData[0];
       }
 
       const { data: logsData } = await supabase
@@ -90,13 +77,11 @@ export default function Dashboard() {
         .eq('is_completed', true);
 
       if (logsData) {
-        const statusMap: Record<string, boolean> = {};
-        logsData.forEach((log) => { statusMap[log.goal_id] = true; });
-        setCompletedToday(statusMap);
+        logsData.forEach((log) => { completedToday[log.goal_id] = true; });
       }
     }
 
-    // 2. Fetch Matchmaking Data
+    let suggestedGroups: any[] = [];
     const { data: onboardingData } = await supabase
       .from('onboarding_responses')
       .select('field_of_interest_id')
@@ -108,22 +93,34 @@ export default function Dashboard() {
         .from('focus_groups')
         .select('*')
         .eq('field_of_interest_id', onboardingData.field_of_interest_id);
-      if (groupsData) setSuggestedGroups(groupsData);
+      if (groupsData) suggestedGroups = groupsData;
     }
 
+    let joinedGroupIds = new Set<string>();
     const { data: memberships } = await supabase
       .from('group_members')
       .select('group_id')
       .eq('user_id', user.id);
 
     if (memberships) {
-      setJoinedGroupIds(new Set(memberships.map((m) => m.group_id)));
+      joinedGroupIds = new Set(memberships.map((m) => m.group_id));
     }
+
+    return {
+      userId: user.id,
+      username: profileData?.username || null,
+      goals,
+      nextTask,
+      completedToday,
+      suggestedGroups,
+      joinedGroupIds
+    };
   };
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  // Implement SWR to cache the data
+  const { data, error, mutate } = useSWR('dashboard_data', fetcher, {
+    revalidateOnFocus: true, // Auto-refreshes silently if you click away and come back
+  });
 
   const handleCheckIn = async (goalId: string, currentPoints: number) => {
     const today = new Date().toISOString().split('T')[0];
@@ -132,34 +129,40 @@ export default function Dashboard() {
       .insert({ goal_id: goalId, log_date: today, is_completed: true });
 
     if (!logError) {
-      const { error: pointError } = await supabase
+      await supabase
         .from('goals')
         .update({ points: currentPoints + 10 })
         .eq('id', goalId);
-      if (!pointError) {
-        setCompletedToday((prev) => ({ ...prev, [goalId]: true }));
-        fetchDashboardData();
-      }
+        
+      // Mutate tells SWR to instantly re-run the fetcher and update the UI cache
+      mutate();
     }
   };
 
   const handleQuickCapture = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quickTask.trim() || !userId) return;
+    if (!quickTask.trim() || !data?.userId) return;
     
     setIsPlanning(true);
     
-    const result = await quickPlan(quickTask, userId);
+    const result = await quickPlan(quickTask, data.userId);
     
     if (result.success) {
       setQuickTask('');
-      await fetchDashboardData(); 
+      mutate(); // Instantly update the dashboard with the new task
     } else {
       alert("Failed to plan task. Please try again.");
     }
     
     setIsPlanning(false);
   };
+
+  // Fallback while SWR makes the very first fetch
+  if (!data && !error) {
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500 font-bold">Syncing Command Center...</div>;
+  }
+
+  const { userId, username, goals, nextTask, completedToday, suggestedGroups, joinedGroupIds } = data || {};
 
   return (
     <main className="min-h-screen bg-gray-50/50 p-6 md:p-12 text-gray-900 relative">
@@ -185,7 +188,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center">
             <span className="text-3xl font-black text-blue-600">
-              {goals.reduce((sum, g) => sum + (g.points || 0), 0)}
+              {goals?.reduce((sum: number, g: any) => sum + (g.points || 0), 0) || 0}
             </span>
             <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Total XP</span>
           </div>
@@ -194,7 +197,7 @@ export default function Dashboard() {
             <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Day Streak</span>
           </div>
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center">
-            <span className="text-3xl font-black text-purple-600">{Object.keys(completedToday).length}</span>
+            <span className="text-3xl font-black text-purple-600">{Object.keys(completedToday || {}).length}</span>
             <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Tasks Done Today</span>
           </div>
         </div>
@@ -255,7 +258,7 @@ export default function Dashboard() {
             {userId && (
               <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mt-8">
                 <h2 className="text-xl font-bold mb-6 text-gray-900">Generate New Roadmap</h2>
-                <GoalCreator userId={userId} onRoadmapCreated={fetchDashboardData} />
+                <GoalCreator userId={userId} onRoadmapCreated={() => mutate()} />
                 <div className="mt-8">
                   <RoadmapDisplay userId={userId} />
                 </div>
@@ -269,12 +272,12 @@ export default function Dashboard() {
             {/* ACTIVE GOALS LIST */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Active Goals</h2>
-              {goals.length === 0 ? (
+              {!goals || goals.length === 0 ? (
                 <p className="text-sm text-gray-500 italic">No active goals.</p>
               ) : (
                 <div className="space-y-3">
-                  {goals.map((goal) => {
-                    const isDone = completedToday[goal.id];
+                  {goals.map((goal: any) => {
+                    const isDone = completedToday?.[goal.id];
                     return (
                       <div key={goal.id} className="p-4 rounded-xl border border-gray-100 bg-gray-50 flex flex-col gap-3">
                         <div>
@@ -307,8 +310,8 @@ export default function Dashboard() {
               
               <div className="space-y-3">
                 <CreatePrivateRoom />
-                {suggestedGroups.map((group) => {
-                  const hasJoined = joinedGroupIds.has(group.id);
+                {suggestedGroups?.map((group: any) => {
+                  const hasJoined = joinedGroupIds?.has(group.id);
                   return (
                     <div key={group.id} className="p-4 rounded-xl border border-gray-100 bg-gray-50">
                       <h4 className="font-bold text-gray-800 text-sm">{group.name}</h4>
