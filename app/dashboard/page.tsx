@@ -2,7 +2,7 @@
 
 import OnboardingModal from '@/components/OnboardingModal';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import GoalCreator from '@/components/GoalCreator';
 import RoadmapDisplay from '@/components/RoadmapDisplay';
@@ -20,9 +20,9 @@ export default function Dashboard() {
 
   const router = useRouter();
 
-  // Quick Capture State (Kept local since it's just for the input field)
   const [quickTask, setQuickTask] = useState('');
   const [isPlanning, setIsPlanning] = useState(false);
+  const [onlineCount, setOnlineCount] = useState(1);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -31,7 +31,6 @@ export default function Dashboard() {
     return 'Good evening';
   };
 
-  // The SWR Fetcher Function: Gathers all dashboard data into one cached object
   const fetcher = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
@@ -117,39 +116,66 @@ export default function Dashboard() {
     };
   };
 
-  // Implement SWR to cache the data
   const { data, error, mutate } = useSWR('dashboard_data', fetcher, {
-    revalidateOnFocus: true, // Auto-refreshes silently if you click away and come back
+    revalidateOnFocus: true,
   });
+
+  useEffect(() => {
+    if (!data?.userId) return;
+
+    const globalChannel = supabase.channel('global_dashboard', {
+      config: { presence: { key: data.userId } },
+    });
+
+    globalChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = globalChannel.presenceState();
+        setOnlineCount(Object.keys(state).length);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await globalChannel.track({ onlineAt: new Date().toISOString() });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(globalChannel);
+    };
+  }, [data?.userId, supabase]);
+
 
   const handleCheckIn = async (goalId: string, currentPoints: number) => {
     const today = new Date().toISOString().split('T')[0];
+    
+    // 1. Log the daily completion
     const { error: logError } = await supabase
       .from('daily_logs')
       .insert({ goal_id: goalId, log_date: today, is_completed: true });
 
-    if (!logError) {
-      await supabase
-        .from('goals')
-        .update({ points: currentPoints + 10 })
-        .eq('id', goalId);
-        
-      // Mutate tells SWR to instantly re-run the fetcher and update the UI cache
+    if (!logError && data?.userId) {
+      // 2. Add 10 points to the specific goal
+      await supabase.from('goals').update({ points: currentPoints + 10 }).eq('id', goalId);
+      
+      // 3. Fetch current total XP from profile, then add 10
+      const { data: profile } = await supabase.from('profiles').select('total_xp').eq('id', data.userId).single();
+      const currentTotal = profile?.total_xp || 0;
+      await supabase.from('profiles').update({ total_xp: currentTotal + 10 }).eq('id', data.userId);
+
       mutate();
     }
   };
+
 
   const handleQuickCapture = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!quickTask.trim() || !data?.userId) return;
     
     setIsPlanning(true);
-    
     const result = await quickPlan(quickTask, data.userId);
     
     if (result.success) {
       setQuickTask('');
-      mutate(); // Instantly update the dashboard with the new task
+      mutate();
     } else {
       alert("Failed to plan task. Please try again.");
     }
@@ -157,7 +183,6 @@ export default function Dashboard() {
     setIsPlanning(false);
   };
 
-  // Fallback while SWR makes the very first fetch
   if (!data && !error) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500 font-bold">Syncing Command Center...</div>;
   }
@@ -171,7 +196,7 @@ export default function Dashboard() {
 
       <div className="max-w-5xl mx-auto space-y-8">
         
-        {/* HEADER: Personalized & Time-Aware */}
+        {/* HEADER */}
         <div className="flex justify-between items-end pb-4 border-b border-gray-200">
           <div>
             <h1 className="text-3xl font-black tracking-tight text-gray-900">
@@ -186,12 +211,16 @@ export default function Dashboard() {
 
         {/* TOP METRICS */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center">
-            <span className="text-3xl font-black text-blue-600">
+          <button 
+            onClick={() => router.push('/leaderboard')}
+            className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-all hover:bg-yellow-50 hover:border-yellow-200 group"
+          >
+            <span className="text-3xl font-black text-blue-600 group-hover:text-yellow-600 transition-colors">
               {goals?.reduce((sum: number, g: any) => sum + (g.points || 0), 0) || 0}
             </span>
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Total XP</span>
-          </div>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1 group-hover:text-yellow-700 transition-colors">Total XP 🏆</span>
+          </button>
+          
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center">
             <span className="text-3xl font-black text-green-600">🔥 1</span>
             <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Day Streak</span>
@@ -269,6 +298,28 @@ export default function Dashboard() {
           {/* RIGHT COLUMN: Secondary Info & Rooms */}
           <div className="md:col-span-1 space-y-6">
             
+            {/* NEW: COMMUNITY PULSE */}
+            <div className="bg-gradient-to-r from-gray-900 to-black p-5 rounded-2xl shadow-sm border border-gray-800 flex flex-col gap-4 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-black uppercase tracking-wider text-gray-400 mb-1">Community Pulse</h2>
+                  <p className="text-lg font-bold">
+                    {onlineCount} {onlineCount === 1 ? 'Hacker' : 'Hackers'} Online
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <span className="w-3 h-3 rounded-full bg-green-500 animate-ping absolute"></span>
+                  <span className="w-3 h-3 rounded-full bg-green-500 relative"></span>
+                </div>
+              </div>
+              <button 
+                onClick={() => router.push('/leaderboard')}
+                className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold rounded-xl transition border border-gray-700 flex items-center justify-center gap-2"
+              >
+                🏆 View Global Leaderboard
+              </button>
+            </div>
+
             {/* ACTIVE GOALS LIST */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Active Goals</h2>

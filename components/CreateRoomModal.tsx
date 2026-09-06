@@ -5,30 +5,30 @@ import { createBrowserClient } from '@supabase/ssr';
 
 export default function CreateRoomModal({ onRoomCreated }: { onRoomCreated: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [topic, setTopic] = useState('General');
-  const [isPublic, setIsPublic] = useState(false);
-  const [scheduledFor, setScheduledFor] = useState(''); // NEW: State for scheduling
+  const [topic, setTopic] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
+  const [scheduledFor, setScheduledFor] = useState('');
+  const [passcode, setPasscode] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  const predefinedTopics = ['General', 'Computer Science', 'DSA', 'Web Development', 'Design', 'Exam Prep'];
-
-  const handleCreateRoom = async (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
-    
-    setLoading(true);
+    setIsCreating(true);
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Convert local datetime-local string to proper ISO timestamp for Supabase, if provided
-    const scheduledTimestamp = scheduledFor ? new Date(scheduledFor).toISOString() : null;
+    let scheduledTimestamp = null;
+    if (scheduledFor) {
+      scheduledTimestamp = new Date(scheduledFor).toISOString();
+    }
 
     const { data: newRoom, error: roomError } = await supabase
       .from('focus_groups')
@@ -37,79 +37,128 @@ export default function CreateRoomModal({ onRoomCreated }: { onRoomCreated: () =
         description, 
         topic, 
         is_public: isPublic,
-        scheduled_for: scheduledTimestamp 
+        scheduled_for: scheduledTimestamp,
+        creator_id: user.id,
+        passcode: passcode.trim() !== '' ? passcode.trim() : null // Save the passcode if provided
       })
       .select('id')
       .single();
 
-    if (!roomError && newRoom) {
-      await supabase.from('group_members').insert({ user_id: user.id, group_id: newRoom.id });
+    if (newRoom && !roomError) {
+      await supabase
+        .from('group_members')
+        .insert({ user_id: user.id, group_id: newRoom.id });
+      
       setIsOpen(false);
       setName('');
       setDescription('');
-      setIsPublic(false);
-      setTopic('General');
+      setTopic('');
       setScheduledFor('');
+      setPasscode('');
       onRoomCreated();
     }
-    setLoading(false);
+    
+    setIsCreating(false);
   };
 
   return (
     <>
       <button 
         onClick={() => setIsOpen(true)}
-        className="px-5 py-2.5 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition shadow-sm text-sm"
+        className="px-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition shadow-sm"
       >
-        + Create Room
+        + Create Focus Room
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl my-8">
-            <h2 className="text-xl font-black text-gray-900 mb-6">Create a Focus Room</h2>
-            <form onSubmit={handleCreateRoom} className="space-y-4">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative">
+            <button 
+              onClick={() => setIsOpen(false)}
+              className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 font-bold"
+            >
+              ✕
+            </button>
+            
+            <h2 className="text-2xl font-black text-gray-900 mb-6">New Focus Room</h2>
+            
+            <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Room Name</label>
-                <input required type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Midnight Hackers" className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Topic</label>
-                  <select value={topic} onChange={(e) => setTopic(e.target.value)} className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
-                    {predefinedTopics.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Schedule (Optional)</label>
-                  <input 
-                    type="datetime-local" 
-                    value={scheduledFor} 
-                    onChange={(e) => setScheduledFor(e.target.value)} 
-                    className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" 
-                  />
-                </div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Room Name</label>
+                <input 
+                  type="text" 
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-900"
+                  placeholder="e.g., Deep Work Sprint"
+                />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What are we focusing on?" className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none h-20" />
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Topic / Goal</label>
+                <input 
+                  type="text" 
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-900"
+                  placeholder="e.g., Physics, DSA, Writing"
+                />
               </div>
-              
-              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
-                <input type="checkbox" id="isPublic" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
-                <label htmlFor="isPublic" className="text-sm font-semibold text-blue-900">
-                  Make this room public <br/><span className="text-xs font-medium text-blue-700">Anyone can discover and join.</span>
-                </label>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Description</label>
+                <textarea 
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 h-24 resize-none"
+                  placeholder="What's the plan for this session?"
+                />
               </div>
-              
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition">Cancel</button>
-                <button type="submit" disabled={loading} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition disabled:opacity-50">
-                  {loading ? 'Creating...' : 'Create Room'}
-                </button>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Schedule For (Optional)</label>
+                <input 
+                  type="datetime-local" 
+                  value={scheduledFor}
+                  onChange={(e) => setScheduledFor(e.target.value)}
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-900"
+                />
               </div>
+
+              {/* NEW: Passcode Field */}
+              <div className="p-4 bg-red-50 border border-red-100 rounded-xl">
+                <label className="block text-xs font-bold text-red-700 uppercase tracking-widest mb-2">Room Passcode (Optional)</label>
+                <input 
+                  type="text" 
+                  value={passcode}
+                  onChange={(e) => setPasscode(e.target.value)}
+                  className="w-full p-3 bg-white border border-red-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-gray-900"
+                  placeholder="Leave blank for an open room"
+                />
+                <p className="text-[10px] text-red-600 font-medium mt-2 leading-relaxed">
+                  If you set a passcode, users will be required to enter it before they can join the session.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input 
+                  type="checkbox" 
+                  id="public" 
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded"
+                />
+                <label htmlFor="public" className="text-sm font-bold text-gray-700">List publicly on Explore page</label>
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={isCreating}
+                className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-lg hover:bg-blue-700 transition shadow-md disabled:opacity-50 mt-4"
+              >
+                {isCreating ? 'Creating Room...' : 'Launch Room'}
+              </button>
             </form>
           </div>
         </div>
