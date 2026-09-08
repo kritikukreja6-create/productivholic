@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import Editor from '@monaco-editor/react';
 import { analyzeCode } from '@/app/actions/analyzecode';
+import toast from 'react-hot-toast';
 
 export default function RoomClient({ roomId }: { roomId: string }) {
   const [timeLeft, setTimeLeft] = useState(25 * 60);
@@ -244,7 +245,7 @@ int main() {
           <button 
             onClick={() => {
               navigator.clipboard.writeText(window.location.href);
-              alert("Invite link copied to clipboard!");
+              toast.success("Invite link copied!");
             }}
             className="absolute top-4 right-4 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition border border-blue-100"
           >
