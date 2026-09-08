@@ -159,7 +159,19 @@ export default function Dashboard() {
       // 3. Fetch current total XP from profile, then add 10
       const { data: profile } = await supabase.from('profiles').select('total_xp').eq('id', data.userId).single();
       const currentTotal = profile?.total_xp || 0;
-      await supabase.from('profiles').update({ total_xp: currentTotal + 10 }).eq('id', data.userId);
+      const newTotal = currentTotal + 10;
+      
+      await supabase.from('profiles').update({ total_xp: newTotal }).eq('id', data.userId);
+
+      // 4. CHECK FOR ACHIEVEMENTS 🏆
+      // Award "First Blood" badge for their very first check-in
+      if (newTotal === 10) {
+        await supabase.from('user_achievements').insert({ user_id: data.userId, badge_id: 'first_blood' });
+      }
+      // Award "Centurion" badge for hitting 100 XP
+      if (newTotal === 100) {
+        await supabase.from('user_achievements').insert({ user_id: data.userId, badge_id: 'centurion' });
+      }
 
       mutate();
     }

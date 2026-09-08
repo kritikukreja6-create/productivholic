@@ -17,18 +17,32 @@ export default function Leaderboard() {
 
   useEffect(() => {
     async function fetchLeaderboard() {
-      // Get the current user to highlight them in the list
       const { data: { user } } = await supabase.auth.getUser();
       if (user) setCurrentUserId(user.id);
 
       // Fetch top 50 users ordered by total_xp
-      const { data, error } = await supabase
+      const { data: profiles, error } = await supabase
         .from('profiles')
         .select('id, username, total_xp')
         .order('total_xp', { ascending: false })
         .limit(50);
 
-      if (data) setLeaders(data);
+      if (profiles) {
+        // Fetch achievements for these profiles
+        const userIds = profiles.map(p => p.id);
+        const { data: achievements } = await supabase
+          .from('user_achievements')
+          .select('user_id, badge_id')
+          .in('user_id', userIds);
+
+        // Map achievements to each profile
+        const leadersWithBadges = profiles.map(profile => ({
+          ...profile,
+          badges: achievements?.filter(a => a.user_id === profile.id).map(a => a.badge_id) || []
+        }));
+
+        setLeaders(leadersWithBadges);
+      }
       setLoading(false);
     }
     fetchLeaderboard();
@@ -66,7 +80,6 @@ export default function Leaderboard() {
                 const isCurrentUser = leader.id === currentUserId;
                 const rank = index + 1;
                 
-                // Styling for Top 3
                 let rankBadge = <span className="text-gray-400 font-black w-8 text-center">{rank}</span>;
                 let rowBg = isCurrentUser ? 'bg-blue-50/50' : 'bg-white hover:bg-gray-50';
                 let nameStyle = 'text-gray-900 font-bold';
@@ -90,10 +103,23 @@ export default function Leaderboard() {
                     <div className="flex items-center gap-4 sm:gap-6">
                       {rankBadge}
                       <div className="flex flex-col">
-                        <span className={nameStyle}>
-                          @{leader.username || 'Anonymous'}
-                          {isCurrentUser && <span className="ml-2 text-[10px] uppercase tracking-widest bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">You</span>}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={nameStyle}>
+                            @{leader.username || 'Anonymous'}
+                          </span>
+                          {isCurrentUser && <span className="text-[10px] uppercase tracking-widest bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">You</span>}
+                        </div>
+                        
+                        {/* Render Badges */}
+                        {leader.badges.length > 0 && (
+                          <div className="flex gap-1.5 mt-1">
+                            {leader.badges.map((badge: string) => (
+                              <span key={badge} className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
+                                {badge === 'first_blood' ? '🎯 First Blood' : badge === 'centurion' ? '💯 Centurion' : badge}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
