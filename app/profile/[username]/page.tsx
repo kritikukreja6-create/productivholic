@@ -24,7 +24,7 @@ export default function PublicProfile() {
       // 1. Fetch Profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, username, total_xp')
+        .select('id, username, total_xp, avatar_url')
         .eq('username', username)
         .single();
 
@@ -91,9 +91,17 @@ export default function PublicProfile() {
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-32 bg-blue-50 rounded-full blur-3xl -mr-16 -mt-16 z-0"></div>
           
-          <div className="w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl shadow-lg flex items-center justify-center text-white text-4xl font-black z-10">
-            {profile?.username?.charAt(0)?.toUpperCase() || 'H'}
-          </div>
+          {profile.avatar_url ? (
+            <img 
+              src={profile.avatar_url} 
+              alt={profile.username}
+              className="w-24 h-24 rounded-2xl shadow-lg object-cover z-10 border-4 border-white"
+            />
+          ) : (
+            <div className="w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl shadow-lg flex items-center justify-center text-white text-4xl font-black z-10 border-4 border-white">
+              {profile?.username?.charAt(0)?.toUpperCase() || 'H'}
+            </div>
+          )}
           
           <div className="text-center sm:text-left z-10">
             <h2 className="text-3xl font-black text-gray-900">@{profile.username}</h2>
